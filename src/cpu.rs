@@ -1,7 +1,7 @@
+use crate::ram::RAM;
 use std::fmt;
 use std::thread::sleep;
 use std::time::Duration;
-use std::{fs::File, io::Read};
 
 const STATUS_NEGATIVE_BIT: u32 = 7;
 const STATUS_OVERFLOW_BIT: u32 = 6;
@@ -126,24 +126,6 @@ impl Registers {
     }
     fn get_negative_bit(&self) -> bool {
         self.get_status_bit(STATUS_NEGATIVE_BIT)
-    }
-}
-
-struct RAM(Box<[u8; 0x10000]>);
-
-impl RAM {
-    fn new() -> Self {
-        Self(Box::new([0; 0x10000]))
-    }
-
-    #[inline]
-    fn read(&self, a: u16) -> u8 {
-        self.0[a as usize]
-    }
-
-    #[inline]
-    fn write(&mut self, a: u16, v: u8) {
-        self.0[a as usize] = v;
     }
 }
 
@@ -1282,17 +1264,12 @@ impl CPU {
 }
 
 impl CPU {
-    pub fn new(path: &str, clock_speed: u32) -> Result<Self, anyhow::Error> {
-        let mut emulator = Self {
+    pub fn new(memory: RAM, clock_speed: u32) -> Self {
+        Self {
             registers: Registers::new(),
-            memory: RAM::new(),
+            memory,
             clock_speed,
-        };
-
-        let mut file = File::open(path)?;
-        file.read(&mut *emulator.memory.0)?;
-
-        Ok(emulator)
+        }
     }
 
     pub fn run(&mut self) {
