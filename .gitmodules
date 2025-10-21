@@ -1,3 +1,6 @@
 [submodule "6502_65C02_functional_tests"]
 	path = vendor/6502_65C02_functional_tests
 	url = https://github.com/Klaus2m5/6502_65C02_functional_tests.git
+[submodule "vendor/nes-test-roms"]
+	path = vendor/nes-test-roms
+	url = https://github.com/christopherpow/nes-test-roms.git
