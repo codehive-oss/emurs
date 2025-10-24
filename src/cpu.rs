@@ -807,9 +807,13 @@ impl CPU {
     }
 
     fn jmp_absolute(&mut self) {
+        let instr_addr = self.registers.pc - 1;
         let lo = self.next();
         let hi = self.next();
         let data = u16::from(lo) | (u16::from(hi) << 8);
+        if data == instr_addr {
+            panic!("Trapped at {:#x}", instr_addr);
+        }
         self.registers.pc = data;
     }
     fn jmp_indirect(&mut self) {
