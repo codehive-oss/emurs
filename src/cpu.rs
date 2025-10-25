@@ -1032,7 +1032,8 @@ impl Cpu {
     fn plp(&mut self) {
         self.clock_cycle();
         let data = self.pull_stack();
-        self.registers.p = data & !(1 << STATUS_BREAK_BIT) & !(1 << STATUS_IGNORED_BIT);
+        const BREAK_IGNORE_MASK: u8 = (1 << STATUS_BREAK_BIT) | (1 << STATUS_IGNORED_BIT);
+        self.registers.p = (data & !BREAK_IGNORE_MASK) | (self.registers.p & BREAK_IGNORE_MASK);
     }
 
     fn brk(&mut self) {
@@ -1496,6 +1497,9 @@ mod test {
         let reference_log = File::open("./vendor/nestest/nestest.log").unwrap();
         let mut idx = 1;
         for line in BufReader::new(reference_log).lines().map(|l| l.unwrap()) {
+            if cpu.registers.pc == 0xC822 {
+                println!("hi");
+            }
             let state = format!(
                 "{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
                 cpu.registers.pc,
