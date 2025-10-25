@@ -340,26 +340,9 @@ impl Cpu {
 
         let v = (!(a ^ m) & (a ^ result) & 0x80) != 0;
 
-        if self.registers.get_decimal_bit() {
-            let mut adj = 0u16;
-            if ((a & 0x0F) as u16 + (m & 0x0F) as u16 + c) > 9 {
-                adj += 0x06;
-            }
-            if sum > 0x99 {
-                adj += 0x60;
-            }
-            let bcd = result.wrapping_add(adj as u8);
-
-            let carry = sum > 0x99;
-
-            self.registers.update_carry_bit(carry);
-            self.registers.update_overflow_bit(v);
-            self.registers.update_a(bcd);
-        } else {
-            self.registers.update_carry_bit(sum > 0xFF);
-            self.registers.update_overflow_bit(v);
-            self.registers.update_a(result);
-        }
+        self.registers.update_carry_bit(sum > 0xFF);
+        self.registers.update_overflow_bit(v);
+        self.registers.update_a(result);
     }
 
     fn sbc(&mut self, m: u8) {
@@ -1497,7 +1480,7 @@ mod test {
         let reference_log = File::open("./vendor/nestest/nestest.log").unwrap();
         let mut idx = 1;
         for line in BufReader::new(reference_log).lines().map(|l| l.unwrap()) {
-            if cpu.registers.pc == 0xC822 {
+            if cpu.registers.pc == 0xC936 {
                 println!("hi");
             }
             let state = format!(
