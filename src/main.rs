@@ -1,21 +1,23 @@
 mod cpu;
-mod ram;
+mod memory_map;
 mod nes_rom;
+mod ram;
 
-use cpu::CPU;
-use ram::RAM;
+use crate::memory_map::MemoryMap;
 use crate::nes_rom::NesRom;
+use cpu::CPU;
 
 fn main() -> Result<(), anyhow::Error> {
     println!("Starting Emulator!");
 
-    let rom = NesRom::read_from_file("./vendor/nes-test-roms/other/manhole.nes");
+    let rom =
+        NesRom::read_from_file("./vendor/nes-test-roms/nes_instr_test/rom_singles/01-implied.nes")?;
     println!("{rom:#?}");
 
-    let mut ram = RAM::new();
-    ram.load("./vendor/6502_65C02_functional_tests/bin_files/6502_functional_test.bin")?;
+    let memory_map = MemoryMap::new(rom);
+    println!("Entry point: {:#X}", memory_map.reset_vector());
 
-    let mut cpu = CPU::new(ram, 1 << 16);
+    let mut cpu = CPU::new(memory_map, 1 << 16);
     cpu.run();
 
     Ok(())

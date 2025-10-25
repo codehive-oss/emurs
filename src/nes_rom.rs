@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::Read;
-use std::{fmt, usize};
+use std::fmt;
 
 #[derive(Debug)]
 pub enum NametableArrangement {
@@ -20,15 +20,15 @@ impl NametableArrangement {
 
 #[derive(Debug)]
 pub enum TvSystem {
-    NTSC,
-    PAL,
+    Ntsc,
+    Pal,
 }
 
 impl TvSystem {
     fn from_bit(value: u8) -> Self {
         match value {
-            0 => Self::NTSC,
-            1 => Self::PAL,
+            0 => Self::Ntsc,
+            1 => Self::Pal,
             _ => panic!("Invalid nametable arrangement"),
         }
     }
@@ -40,7 +40,7 @@ const CHR_ROM_CHUNK_SIZE: usize = 8192;
 const TRAINER_SIZE: usize = 512;
 
 pub struct NesRom {
-    prg_rom: Vec<u8>,
+    pub prg_rom: Vec<u8>,
     chr_rom: Vec<u8>,
     trainer: Option<[u8; TRAINER_SIZE]>,
     mapper: u8,
@@ -97,7 +97,6 @@ impl fmt::Debug for NesRom {
 }
 
 impl NesRom {
-
     /// Reads an NES rom from the specified file and parses it according to the [iNES](https://www.nesdev.org/wiki/INES) format
     pub fn read_from_file(path: &str) -> Result<Self, anyhow::Error> {
         let mut file = File::open(path)?;
@@ -144,5 +143,9 @@ impl NesRom {
             prg_ram_size,
             tv_system,
         })
+    }
+
+    pub fn prg_rom_chunks(&self) -> usize {
+        self.prg_rom.len() / PRG_ROM_CHUNK_SIZE
     }
 }

@@ -1,15 +1,15 @@
 use std::{fs::File, io::Read};
 
-pub struct RAM(Box<[u8; 0x10000]>);
+pub struct RAM(Vec<u8>);
 
 impl RAM {
-    pub fn new() -> Self {
-        Self(Box::new([0; 0x10000]))
+    pub fn new(size: usize) -> Self {
+        Self(vec![0; size])
     }
 
     pub fn load(&mut self, path: &str) -> Result<(), anyhow::Error> {
         let mut file = File::open(path)?;
-        file.read(&mut *self.0)?;
+        file.read_to_end(&mut self.0)?;
         Ok(())
     }
 

@@ -1,4 +1,4 @@
-use crate::ram::RAM;
+use crate::memory_map::MemoryMap;
 use std::fmt;
 use std::thread::sleep;
 use std::time::Duration;
@@ -47,13 +47,13 @@ impl fmt::Display for Registers {
 }
 
 impl Registers {
-    fn new() -> Self {
+    fn new(entrypoint: u16) -> Self {
         Self {
             a: 0,
             x: 0,
             y: 0,
             s: 0,
-            pc: 0x0400,
+            pc: entrypoint,
             p: 0,
         }
     }
@@ -137,7 +137,7 @@ enum Access {
 
 pub struct CPU {
     registers: Registers,
-    memory: RAM,
+    memory: MemoryMap,
     clock_speed: u32,
 }
 
@@ -1268,9 +1268,9 @@ impl CPU {
 }
 
 impl CPU {
-    pub fn new(memory: RAM, clock_speed: u32) -> Self {
+    pub fn new(memory: MemoryMap, clock_speed: u32) -> Self {
         Self {
-            registers: Registers::new(),
+            registers: Registers::new(memory.reset_vector()),
             memory,
             clock_speed,
         }
@@ -1278,6 +1278,7 @@ impl CPU {
 
     pub fn run(&mut self) {
         loop {
+            println!("{}", self.memory.read(0x6000));
             println!("{}", self.registers);
             let instruction = self.next();
             println!("interpreting {instruction:2X}");
