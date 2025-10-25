@@ -13,6 +13,8 @@ const STATUS_INTERRUPT_BIT: u32 = 2;
 const STATUS_ZERO_BIT: u32 = 1;
 const STATUS_CARRY_BIT: u32 = 0;
 
+const STATUS_BREAK_IGNORED_MASK: u8 = (1 << STATUS_BREAK_BIT) | (1 << STATUS_IGNORED_BIT);
+
 const INTERRUPT_VECTOR_NMI_LO: u16 = 0xFFFA;
 const INTERRUPT_VECTOR_NMI_HI: u16 = 0xFFFB;
 const INTERRUPT_VECTOR_RES_LO: u16 = 0xFFFC;
@@ -1015,8 +1017,8 @@ impl Cpu {
     fn plp(&mut self) {
         self.clock_cycle();
         let data = self.pull_stack();
-        const BREAK_IGNORE_MASK: u8 = (1 << STATUS_BREAK_BIT) | (1 << STATUS_IGNORED_BIT);
-        self.registers.p = (data & !BREAK_IGNORE_MASK) | (self.registers.p & BREAK_IGNORE_MASK);
+        self.registers.p =
+            (data & !STATUS_BREAK_IGNORED_MASK) | (self.registers.p & STATUS_BREAK_IGNORED_MASK);
     }
 
     fn brk(&mut self) {
@@ -1039,8 +1041,8 @@ impl Cpu {
     fn rti(&mut self) {
         self.clock_cycle();
 
-        self.registers.p =
-            self.pull_stack() & !(1 << STATUS_BREAK_BIT) & !(1 << STATUS_IGNORED_BIT);
+        self.registers.p = (self.pull_stack() & !STATUS_BREAK_IGNORED_MASK)
+            | (self.registers.p & STATUS_BREAK_IGNORED_MASK);
 
         let ret_lo = self.pull_stack();
         let ret_hi = self.pull_stack();
@@ -1480,7 +1482,7 @@ mod test {
         let reference_log = File::open("./vendor/nestest/nestest.log").unwrap();
         let mut idx = 1;
         for line in BufReader::new(reference_log).lines().map(|l| l.unwrap()) {
-            if cpu.registers.pc == 0xC936 {
+            if cpu.registers.pc == 0xDBB5 {
                 println!("hi");
             }
             let state = format!(
