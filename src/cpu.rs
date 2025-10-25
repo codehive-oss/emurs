@@ -801,11 +801,16 @@ impl Cpu {
         self.registers.pc = data;
     }
     fn jmp_indirect(&mut self) {
-        let lo = self.next();
-        let hi = self.next();
-        let addr = u16::from(lo) | (u16::from(hi) << 8);
+        let addr_lo = self.next();
+        let addr_hi = self.next();
+        let addr = u16::from(addr_lo) | (u16::from(addr_hi) << 8);
         let data_lo = self.read_memory(addr);
-        let data_hi = self.read_memory(addr.wrapping_add(1));
+        // page crossing bug
+        let data_hi = if addr_lo == 0xff {
+            self.read_memory(addr & 0xff00)
+        } else {
+            self.read_memory(addr.wrapping_add(1))
+        };
         let data = u16::from(data_lo) | (u16::from(data_hi) << 8);
         self.registers.pc = data;
     }
