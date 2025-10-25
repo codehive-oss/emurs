@@ -55,15 +55,15 @@ impl fmt::Debug for NesRom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         #[derive(Debug)]
         struct NesRom<'a> {
-            prg_rom_chunks: u8,
-            chr_rom_chunks: u8,
-            has_trainer: bool,
-            mapper: &'a u8,
-            alt_nametable: &'a bool,
-            nametable_arrangement: &'a NametableArrangement,
-            battery_backed_prg_ram: &'a bool,
-            prg_ram_size: &'a u8,
-            tv_system: &'a TvSystem,
+            _prg_rom_chunks: u8,
+            _chr_rom_chunks: u8,
+            _has_trainer: bool,
+            _mapper: &'a u8,
+            _alt_nametable: &'a bool,
+            _nametable_arrangement: &'a NametableArrangement,
+            _battery_backed_prg_ram: &'a bool,
+            _prg_ram_size: &'a u8,
+            _tv_system: &'a TvSystem,
         }
 
         let Self {
@@ -81,15 +81,15 @@ impl fmt::Debug for NesRom {
 
         fmt::Debug::fmt(
             &NesRom {
-                prg_rom_chunks: (prg_rom.len() / PRG_ROM_CHUNK_SIZE) as u8,
-                chr_rom_chunks: (chr_rom.len() / CHR_ROM_CHUNK_SIZE) as u8,
-                has_trainer: trainer.is_some(),
-                mapper,
-                alt_nametable,
-                nametable_arrangement,
-                battery_backed_prg_ram: prg_ram,
-                prg_ram_size,
-                tv_system,
+                _prg_rom_chunks: (prg_rom.len() / PRG_ROM_CHUNK_SIZE) as u8,
+                _chr_rom_chunks: (chr_rom.len() / CHR_ROM_CHUNK_SIZE) as u8,
+                _has_trainer: trainer.is_some(),
+                _mapper: mapper,
+                _alt_nametable: alt_nametable,
+                _nametable_arrangement: nametable_arrangement,
+                _battery_backed_prg_ram: prg_ram,
+                _prg_ram_size: prg_ram_size,
+                _tv_system: tv_system,
             },
             f,
         )
@@ -145,7 +145,4 @@ impl NesRom {
         })
     }
 
-    pub fn prg_rom_chunks(&self) -> usize {
-        self.prg_rom.len() / PRG_ROM_CHUNK_SIZE
-    }
 }

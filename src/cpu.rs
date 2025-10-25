@@ -1,5 +1,6 @@
 use crate::memory_map::MemoryMap;
 use std::fmt;
+use std::io::BufRead;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -135,13 +136,13 @@ enum Access {
     ReadModify,
 }
 
-pub struct CPU {
+pub struct Cpu {
     registers: Registers,
     memory: MemoryMap,
     clock_speed: u32,
 }
 
-impl CPU {
+impl Cpu {
     fn clock_cycle(&self) {
         if self.clock_speed == 0 {
             return;
@@ -189,8 +190,7 @@ impl CPU {
     fn addr_absolute(&mut self) -> u16 {
         let lo = self.next();
         let hi = self.next();
-        let addr = u16::from(lo) | (u16::from(hi) << 8);
-        addr
+        u16::from(lo) | (u16::from(hi) << 8)
     }
 
     fn addr_absolute_x(&mut self, access: Access) -> u16 {
@@ -246,8 +246,7 @@ impl CPU {
 
         let lo = self.read_memory(u16::from(first_addr));
         let hi = self.read_memory(u16::from(first_addr.wrapping_add(1)));
-        let addr = u16::from(lo) | (u16::from(hi) << 8);
-        addr
+        u16::from(lo) | (u16::from(hi) << 8)
     }
 
     fn addr_postindexed_indirect_zeropage_y(&mut self, access: Access) -> u16 {
@@ -287,7 +286,7 @@ impl CPU {
 
     fn read_zeropage_y(&mut self) -> u8 {
         let addr = self.addr_zeropage_y();
-        self.read_memory(u16::from(addr))
+        self.read_memory(addr)
     }
 
     fn read_absolute(&mut self) -> u8 {
@@ -517,7 +516,7 @@ impl CPU {
     }
 }
 
-impl CPU {
+impl Cpu {
     fn nop(&mut self) {}
 
     fn adc_immediate(&mut self) {
@@ -1267,7 +1266,7 @@ impl CPU {
     }
 }
 
-impl CPU {
+impl Cpu {
     pub fn new(memory: MemoryMap, clock_speed: u32) -> Self {
         Self {
             registers: Registers::new(memory.reset_vector()),
@@ -1278,198 +1277,243 @@ impl CPU {
 
     pub fn run(&mut self) {
         loop {
-            println!("{}", self.memory.read(0x6000));
-            println!("{}", self.registers);
-            let instruction = self.next();
-            println!("interpreting {instruction:2X}");
+            self.step();
+        }
+    }
+
+    pub fn step(&mut self) {
+        println!("{}", self.registers);
+        let instruction = self.next();
+        println!("interpreting {instruction:2X}");
+        println!();
+
+        match instruction {
+            0xEA => self.nop(),
+            0x69 => self.adc_immediate(),
+            0x65 => self.adc_zeropage(),
+            0x75 => self.adc_zeropage_x(),
+            0x6D => self.adc_absolute(),
+            0x7D => self.adc_absolute_x(),
+            0x79 => self.adc_absolute_y(),
+            0x61 => self.adc_preindexed_indirect_zeropage_x(),
+            0x71 => self.adc_postindexed_indirect_zeropage_y(),
+
+            0xE9 => self.sbc_immediate(),
+            0xE5 => self.sbc_zeropage(),
+            0xF5 => self.sbc_zeropage_x(),
+            0xED => self.sbc_absolute(),
+            0xFD => self.sbc_absolute_x(),
+            0xF9 => self.sbc_absolute_y(),
+            0xE1 => self.sbc_preindexed_indirect_zeropage_x(),
+            0xF1 => self.sbc_postindexed_indirect_zeropage_y(),
+
+            0x29 => self.and_immediate(),
+            0x25 => self.and_zeropage(),
+            0x35 => self.and_zeropage_x(),
+            0x2D => self.and_absolute(),
+            0x3D => self.and_absolute_x(),
+            0x39 => self.and_absolute_y(),
+            0x21 => self.and_preindexed_indirect_zeropage_x(),
+            0x31 => self.and_postindexed_indirect_zeropage_y(),
+
+            0x09 => self.ora_immediate(),
+            0x05 => self.ora_zeropage(),
+            0x15 => self.ora_zeropage_x(),
+            0x0D => self.ora_absolute(),
+            0x1D => self.ora_absolute_x(),
+            0x19 => self.ora_absolute_y(),
+            0x01 => self.ora_preindexed_indirect_zeropage_x(),
+            0x11 => self.ora_postindexed_indirect_zeropage_y(),
+
+            0x49 => self.eor_immediate(),
+            0x45 => self.eor_zeropage(),
+            0x55 => self.eor_zeropage_x(),
+            0x4D => self.eor_absolute(),
+            0x5D => self.eor_absolute_x(),
+            0x59 => self.eor_absolute_y(),
+            0x41 => self.eor_preindexed_indirect_zeropage_x(),
+            0x51 => self.eor_postindexed_indirect_zeropage_y(),
+
+            0x4C => self.jmp_absolute(),
+            0x6C => self.jmp_indirect(),
+
+            0x20 => self.jsr(),
+            0x60 => self.rts(),
+
+            0xA9 => self.lda_immediate(),
+            0xA5 => self.lda_zeropage(),
+            0xB5 => self.lda_zeropage_x(),
+            0xAD => self.lda_absolute(),
+            0xBD => self.lda_absolute_x(),
+            0xB9 => self.lda_absolute_y(),
+            0xA1 => self.lda_preindexed_indirect_zeropage_x(),
+            0xB1 => self.lda_postindexed_indirect_zeropage_y(),
+
+            0xA2 => self.ldx_immediate(),
+            0xA6 => self.ldx_zeropage(),
+            0xB6 => self.ldx_zeropage_y(),
+            0xAE => self.ldx_absolute(),
+            0xBE => self.ldx_absolute_y(),
+
+            0xA0 => self.ldy_immediate(),
+            0xA4 => self.ldy_zeropage(),
+            0xB4 => self.ldy_zeropage_x(),
+            0xAC => self.ldy_absolute(),
+            0xBC => self.ldy_absolute_x(),
+
+            0x85 => self.sta_zeropage(),
+            0x95 => self.sta_zeropage_x(),
+            0x8D => self.sta_absolute(),
+            0x9D => self.sta_absolute_x(),
+            0x99 => self.sta_absolute_y(),
+            0x81 => self.sta_preindexed_indirect_zeropage_x(),
+            0x91 => self.sta_postindexed_indirect_zeropage_y(),
+
+            0x86 => self.stx_zeropage(),
+            0x96 => self.stx_zeropage_y(),
+            0x8E => self.stx_absolute(),
+
+            0x84 => self.sty_zeropage(),
+            0x94 => self.sty_zeropage_x(),
+            0x8C => self.sty_absolute(),
+
+            0xC9 => self.cmp_immediate(),
+            0xC5 => self.cmp_zeropage(),
+            0xD5 => self.cmp_zeropage_x(),
+            0xCD => self.cmp_absolute(),
+            0xDD => self.cmp_absolute_x(),
+            0xD9 => self.cmp_absolute_y(),
+            0xC1 => self.cmp_preindexed_indirect_zeropage_x(),
+            0xD1 => self.cmp_postindexed_indirect_zeropage_y(),
+
+            0xE0 => self.cpx_immediate(),
+            0xE4 => self.cpx_zeropage(),
+            0xEC => self.cpx_absolute(),
+
+            0xC0 => self.cpy_immediate(),
+            0xC4 => self.cpy_zeropage(),
+            0xCC => self.cpy_absolute(),
+
+            0xAA => self.tax(),
+            0xA8 => self.tay(),
+            0xBA => self.tsx(),
+            0x8A => self.txa(),
+            0x9A => self.txs(),
+            0x98 => self.tya(),
+
+            0x90 => self.bcc(),
+            0xB0 => self.bcs(),
+            0xF0 => self.beq(),
+            0x30 => self.bmi(),
+            0xD0 => self.bne(),
+            0x10 => self.bpl(),
+            0x50 => self.bvc(),
+            0x70 => self.bvs(),
+
+            0x18 => self.clc(),
+            0xD8 => self.cld(),
+            0x58 => self.cli(),
+            0xB8 => self.clv(),
+
+            0x38 => self.sec(),
+            0xF8 => self.sed(),
+            0x78 => self.sei(),
+
+            0xCA => self.dex(),
+            0x88 => self.dey(),
+            0xE8 => self.inx(),
+            0xC8 => self.iny(),
+
+            0x48 => self.pha(),
+            0x08 => self.php(),
+            0x68 => self.pla(),
+            0x28 => self.plp(),
+
+            0x00 => self.brk(),
+            0x40 => self.rti(),
+
+            0x24 => self.bit_zeropage(),
+            0x2C => self.bit_absolute(),
+
+            0x0A => self.asl_accumulator(),
+            0x06 => self.asl_zeropage(),
+            0x16 => self.asl_zeropage_x(),
+            0x0E => self.asl_absolute(),
+            0x1E => self.asl_absolute_x(),
+
+            0x4A => self.lsr_accumulator(),
+            0x46 => self.lsr_zeropage(),
+            0x56 => self.lsr_zeropage_x(),
+            0x4E => self.lsr_absolute(),
+            0x5E => self.lsr_absolute_x(),
+
+            0x2A => self.rol_accumulator(),
+            0x26 => self.rol_zeropage(),
+            0x36 => self.rol_zeropage_x(),
+            0x2E => self.rol_absolute(),
+            0x3E => self.rol_absolute_x(),
+
+            0x6A => self.ror_accumulator(),
+            0x66 => self.ror_zeropage(),
+            0x76 => self.ror_zeropage_x(),
+            0x6E => self.ror_absolute(),
+            0x7E => self.ror_absolute_x(),
+
+            0xE6 => self.inc_zeropage(),
+            0xF6 => self.inc_zeropage_x(),
+            0xEE => self.inc_absolute(),
+            0xFE => self.inc_absolute_x(),
+
+            0xC6 => self.dec_zeropage(),
+            0xD6 => self.dec_zeropage_x(),
+            0xCE => self.dec_absolute(),
+            0xDE => self.dec_absolute_x(),
+
+            x => {
+                unreachable!("invalid instruction: {:X}", x);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::cpu::Cpu;
+    use crate::memory_map::MemoryMap;
+    use crate::nes_rom::NesRom;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    #[test]
+    fn nestest() {
+        let rom = NesRom::read_from_file("./vendor/nestest/nestest.nes").unwrap();
+        let memory_map = MemoryMap::new(rom);
+        let mut cpu = Cpu::new(memory_map, 1 << 16);
+        cpu.registers.pc = 0xC000;
+        cpu.registers.p = 0x24;
+        cpu.registers.s = 0xFD;
+
+        let reference_log = File::open("./vendor/nestest/nestest.log").unwrap();
+        let mut idx = 1;
+        for line in BufReader::new(reference_log).lines().map(|l| l.unwrap()) {
+            let state = format!(
+                "{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+                cpu.registers.pc,
+                cpu.registers.a,
+                cpu.registers.x,
+                cpu.registers.y,
+                cpu.registers.p,
+                cpu.registers.s
+            );
+            let expected = format!("{} {}", &line[0..4], &line[48..73]);
+            println!("EMU: {}", state);
+            println!("REF: {}", expected);
             println!();
 
-            match instruction {
-                0xEA => self.nop(),
-                0x69 => self.adc_immediate(),
-                0x65 => self.adc_zeropage(),
-                0x75 => self.adc_zeropage_x(),
-                0x6D => self.adc_absolute(),
-                0x7D => self.adc_absolute_x(),
-                0x79 => self.adc_absolute_y(),
-                0x61 => self.adc_preindexed_indirect_zeropage_x(),
-                0x71 => self.adc_postindexed_indirect_zeropage_y(),
+            assert_eq!(state, expected, "mismatch on line {}", idx);
 
-                0xE9 => self.sbc_immediate(),
-                0xE5 => self.sbc_zeropage(),
-                0xF5 => self.sbc_zeropage_x(),
-                0xED => self.sbc_absolute(),
-                0xFD => self.sbc_absolute_x(),
-                0xF9 => self.sbc_absolute_y(),
-                0xE1 => self.sbc_preindexed_indirect_zeropage_x(),
-                0xF1 => self.sbc_postindexed_indirect_zeropage_y(),
-
-                0x29 => self.and_immediate(),
-                0x25 => self.and_zeropage(),
-                0x35 => self.and_zeropage_x(),
-                0x2D => self.and_absolute(),
-                0x3D => self.and_absolute_x(),
-                0x39 => self.and_absolute_y(),
-                0x21 => self.and_preindexed_indirect_zeropage_x(),
-                0x31 => self.and_postindexed_indirect_zeropage_y(),
-
-                0x09 => self.ora_immediate(),
-                0x05 => self.ora_zeropage(),
-                0x15 => self.ora_zeropage_x(),
-                0x0D => self.ora_absolute(),
-                0x1D => self.ora_absolute_x(),
-                0x19 => self.ora_absolute_y(),
-                0x01 => self.ora_preindexed_indirect_zeropage_x(),
-                0x11 => self.ora_postindexed_indirect_zeropage_y(),
-
-                0x49 => self.eor_immediate(),
-                0x45 => self.eor_zeropage(),
-                0x55 => self.eor_zeropage_x(),
-                0x4D => self.eor_absolute(),
-                0x5D => self.eor_absolute_x(),
-                0x59 => self.eor_absolute_y(),
-                0x41 => self.eor_preindexed_indirect_zeropage_x(),
-                0x51 => self.eor_postindexed_indirect_zeropage_y(),
-
-                0x4C => self.jmp_absolute(),
-                0x6C => self.jmp_indirect(),
-
-                0x20 => self.jsr(),
-                0x60 => self.rts(),
-
-                0xA9 => self.lda_immediate(),
-                0xA5 => self.lda_zeropage(),
-                0xB5 => self.lda_zeropage_x(),
-                0xAD => self.lda_absolute(),
-                0xBD => self.lda_absolute_x(),
-                0xB9 => self.lda_absolute_y(),
-                0xA1 => self.lda_preindexed_indirect_zeropage_x(),
-                0xB1 => self.lda_postindexed_indirect_zeropage_y(),
-
-                0xA2 => self.ldx_immediate(),
-                0xA6 => self.ldx_zeropage(),
-                0xB6 => self.ldx_zeropage_y(),
-                0xAE => self.ldx_absolute(),
-                0xBE => self.ldx_absolute_y(),
-
-                0xA0 => self.ldy_immediate(),
-                0xA4 => self.ldy_zeropage(),
-                0xB4 => self.ldy_zeropage_x(),
-                0xAC => self.ldy_absolute(),
-                0xBC => self.ldy_absolute_x(),
-
-                0x85 => self.sta_zeropage(),
-                0x95 => self.sta_zeropage_x(),
-                0x8D => self.sta_absolute(),
-                0x9D => self.sta_absolute_x(),
-                0x99 => self.sta_absolute_y(),
-                0x81 => self.sta_preindexed_indirect_zeropage_x(),
-                0x91 => self.sta_postindexed_indirect_zeropage_y(),
-
-                0x86 => self.stx_zeropage(),
-                0x96 => self.stx_zeropage_y(),
-                0x8E => self.stx_absolute(),
-
-                0x84 => self.sty_zeropage(),
-                0x94 => self.sty_zeropage_x(),
-                0x8C => self.sty_absolute(),
-
-                0xC9 => self.cmp_immediate(),
-                0xC5 => self.cmp_zeropage(),
-                0xD5 => self.cmp_zeropage_x(),
-                0xCD => self.cmp_absolute(),
-                0xDD => self.cmp_absolute_x(),
-                0xD9 => self.cmp_absolute_y(),
-                0xC1 => self.cmp_preindexed_indirect_zeropage_x(),
-                0xD1 => self.cmp_postindexed_indirect_zeropage_y(),
-
-                0xE0 => self.cpx_immediate(),
-                0xE4 => self.cpx_zeropage(),
-                0xEC => self.cpx_absolute(),
-
-                0xC0 => self.cpy_immediate(),
-                0xC4 => self.cpy_zeropage(),
-                0xCC => self.cpy_absolute(),
-
-                0xAA => self.tax(),
-                0xA8 => self.tay(),
-                0xBA => self.tsx(),
-                0x8A => self.txa(),
-                0x9A => self.txs(),
-                0x98 => self.tya(),
-
-                0x90 => self.bcc(),
-                0xB0 => self.bcs(),
-                0xF0 => self.beq(),
-                0x30 => self.bmi(),
-                0xD0 => self.bne(),
-                0x10 => self.bpl(),
-                0x50 => self.bvc(),
-                0x70 => self.bvs(),
-
-                0x18 => self.clc(),
-                0xD8 => self.cld(),
-                0x58 => self.cli(),
-                0xB8 => self.clv(),
-
-                0x38 => self.sec(),
-                0xF8 => self.sed(),
-                0x78 => self.sei(),
-
-                0xCA => self.dex(),
-                0x88 => self.dey(),
-                0xE8 => self.inx(),
-                0xC8 => self.iny(),
-
-                0x48 => self.pha(),
-                0x08 => self.php(),
-                0x68 => self.pla(),
-                0x28 => self.plp(),
-
-                0x00 => self.brk(),
-                0x40 => self.rti(),
-
-                0x24 => self.bit_zeropage(),
-                0x2C => self.bit_absolute(),
-
-                0x0A => self.asl_accumulator(),
-                0x06 => self.asl_zeropage(),
-                0x16 => self.asl_zeropage_x(),
-                0x0E => self.asl_absolute(),
-                0x1E => self.asl_absolute_x(),
-
-                0x4A => self.lsr_accumulator(),
-                0x46 => self.lsr_zeropage(),
-                0x56 => self.lsr_zeropage_x(),
-                0x4E => self.lsr_absolute(),
-                0x5E => self.lsr_absolute_x(),
-
-                0x2A => self.rol_accumulator(),
-                0x26 => self.rol_zeropage(),
-                0x36 => self.rol_zeropage_x(),
-                0x2E => self.rol_absolute(),
-                0x3E => self.rol_absolute_x(),
-
-                0x6A => self.ror_accumulator(),
-                0x66 => self.ror_zeropage(),
-                0x76 => self.ror_zeropage_x(),
-                0x6E => self.ror_absolute(),
-                0x7E => self.ror_absolute_x(),
-
-                0xE6 => self.inc_zeropage(),
-                0xF6 => self.inc_zeropage_x(),
-                0xEE => self.inc_absolute(),
-                0xFE => self.inc_absolute_x(),
-
-                0xC6 => self.dec_zeropage(),
-                0xD6 => self.dec_zeropage_x(),
-                0xCE => self.dec_absolute(),
-                0xDE => self.dec_absolute_x(),
-
-                x => {
-                    unreachable!("invalid instruction: {:X}", x);
-                }
-            }
+            idx += 1;
+            cpu.step();
         }
     }
 }
