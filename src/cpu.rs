@@ -1,6 +1,5 @@
 use crate::memory_map::MemoryMap;
 use std::fmt;
-use std::io::BufRead;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -1487,9 +1486,6 @@ mod test {
         let reference_log = File::open("./vendor/nestest/nestest.log").unwrap();
         let mut idx = 1;
         for line in BufReader::new(reference_log).lines().map(|l| l.unwrap()) {
-            if cpu.registers.pc == 0xDBB5 {
-                println!("hi");
-            }
             let state = format!(
                 "{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
                 cpu.registers.pc,
