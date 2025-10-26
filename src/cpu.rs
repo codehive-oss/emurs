@@ -36,14 +36,14 @@ impl fmt::Display for Registers {
             f,
             "PC:{:04X}  A:{:02X}  X:{:02X}  Y:{:02X}  P:{:02X}  S:{:02X}\nN|V|-|B|D|I|Z|C\n{}|{}|{}|{}|{}|{}|{}|{}",
             self.pc, self.a, self.x, self.y, self.p, self.s,
-            if (self.p & (1 << 7)) != 0 { 1 } else {0},
-            if (self.p & (1 << 6)) != 0 { 1 } else {0},
-            if (self.p & (1 << 5)) != 0 { 1 } else {0},
-            if (self.p & (1 << 4)) != 0 { 1 } else {0},
-            if (self.p & (1 << 3)) != 0 { 1 } else {0},
-            if (self.p & (1 << 2)) != 0 { 1 } else {0},
-            if (self.p & (1 << 1)) != 0 { 1 } else {0},
-            if (self.p & (1 << 0)) != 0 { 1 } else {0},
+            if (self.p & (1 << 7)) != 0 { 1 } else { 0 },
+            if (self.p & (1 << 6)) != 0 { 1 } else { 0 },
+            if (self.p & (1 << 5)) != 0 { 1 } else { 0 },
+            if (self.p & (1 << 4)) != 0 { 1 } else { 0 },
+            if (self.p & (1 << 3)) != 0 { 1 } else { 0 },
+            if (self.p & (1 << 2)) != 0 { 1 } else { 0 },
+            if (self.p & (1 << 1)) != 0 { 1 } else { 0 },
+            if (self.p & (1 << 0)) != 0 { 1 } else { 0 },
         )
     }
 }
@@ -137,7 +137,24 @@ enum Access {
     ReadModify,
 }
 
+const NES_CPU_OPTIONS: CpuOptions = CpuOptions {
+    ignore_decimal_bit: true,
+};
+
+pub struct CpuOptions {
+    ignore_decimal_bit: bool,
+}
+
+impl Default for CpuOptions {
+    fn default() -> Self {
+        Self {
+            ignore_decimal_bit: false,
+        }
+    }
+}
+
 pub struct Cpu {
+    options: CpuOptions,
     registers: Registers,
     memory: MemoryMap,
     clock_speed: u32,
@@ -341,9 +358,26 @@ impl Cpu {
 
         let v = (!(a ^ m) & (a ^ result) & 0x80) != 0;
 
-        self.registers.update_carry_bit(sum > 0xFF);
-        self.registers.update_overflow_bit(v);
-        self.registers.update_a(result);
+        if !self.options.ignore_decimal_bit && self.registers.get_decimal_bit() {
+            let mut adj = 0u16;
+            if ((a & 0x0F) as u16 + (m & 0x0F) as u16 + c) > 9 {
+                adj += 0x06;
+            }
+            if sum > 0x99 {
+                adj += 0x60;
+            }
+            let bcd = result.wrapping_add(adj as u8);
+
+            let carry = sum > 0x99;
+
+            self.registers.update_carry_bit(carry);
+            self.registers.update_overflow_bit(v);
+            self.registers.update_a(bcd);
+        } else {
+            self.registers.update_carry_bit(sum > 0xFF);
+            self.registers.update_overflow_bit(v);
+            self.registers.update_a(result);
+        }
     }
 
     fn sbc(&mut self, m: u8) {
@@ -1257,8 +1291,18 @@ impl Cpu {
 }
 
 impl Cpu {
-    pub fn new(memory: MemoryMap, clock_speed: u32) -> Self {
+    pub fn new(options: CpuOptions, memory: MemoryMap, clock_speed: u32) -> Self {
         Self {
+            options,
+            registers: Registers::new(memory.reset_vector()),
+            memory,
+            clock_speed,
+        }
+    }
+
+    pub fn with_nes_options(memory: MemoryMap, clock_speed: u32) -> Self {
+        Self {
+            options: NES_CPU_OPTIONS,
             registers: Registers::new(memory.reset_vector()),
             memory,
             clock_speed,
@@ -1468,7 +1512,7 @@ impl Cpu {
 
 #[cfg(test)]
 mod test {
-    use crate::cpu::Cpu;
+    use crate::cpu::{Cpu, CpuOptions};
     use crate::memory_map::MemoryMap;
     use crate::nes_rom::NesRom;
     use std::fs::File;
@@ -1478,7 +1522,7 @@ mod test {
     fn nestest() {
         let rom = NesRom::read_from_file("./vendor/nestest/nestest.nes").unwrap();
         let memory_map = MemoryMap::new(rom);
-        let mut cpu = Cpu::new(memory_map, 1 << 16);
+        let mut cpu = Cpu::with_nes_options(memory_map, 1 << 16);
         cpu.registers.pc = 0xC000;
         cpu.registers.p = 0x24;
         cpu.registers.s = 0xFD;
@@ -1486,6 +1530,10 @@ mod test {
         let reference_log = File::open("./vendor/nestest/nestest.log").unwrap();
         let mut idx = 1;
         for line in BufReader::new(reference_log).lines().map(|l| l.unwrap()) {
+            if idx == 5004 {
+                // first inofficial opcode (not currently supported)
+                break;
+            }
             let state = format!(
                 "{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
                 cpu.registers.pc,

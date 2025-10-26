@@ -16,7 +16,7 @@ fn main() -> Result<(), anyhow::Error> {
     let memory_map = MemoryMap::new(rom);
     println!("Entry point: {:#X}", memory_map.reset_vector());
 
-    let mut cpu = Cpu::new(memory_map, 1 << 16);
+    let mut cpu = Cpu::with_nes_options(memory_map, 1 << 16);
     cpu.run();
 
     Ok(())
