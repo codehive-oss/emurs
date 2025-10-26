@@ -1,13 +1,13 @@
 use crate::nes_rom::NesRom;
 use crate::ram::Ram;
 
-pub struct MemoryMap {
+pub struct CpuMemory {
     sram: Ram,
     rom: NesRom,
     prg_ram: Ram
 }
 
-impl MemoryMap {
+impl CpuMemory {
     pub fn new(rom: NesRom) -> Self {
         Self {
             sram: Ram::new(0x8000),

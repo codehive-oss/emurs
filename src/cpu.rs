@@ -1,7 +1,9 @@
-use crate::memory_map::MemoryMap;
+use cpu_memory::CpuMemory;
 use std::fmt;
 use std::thread::sleep;
 use std::time::Duration;
+
+pub mod cpu_memory;
 
 const STATUS_NEGATIVE_BIT: u32 = 7;
 const STATUS_OVERFLOW_BIT: u32 = 6;
@@ -156,7 +158,7 @@ impl Default for CpuOptions {
 pub struct Cpu {
     options: CpuOptions,
     registers: Registers,
-    memory: MemoryMap,
+    memory: CpuMemory,
     clock_speed: u32,
 }
 
@@ -1291,7 +1293,7 @@ impl Cpu {
 }
 
 impl Cpu {
-    pub fn new(options: CpuOptions, memory: MemoryMap, clock_speed: u32) -> Self {
+    pub fn new(options: CpuOptions, memory: CpuMemory, clock_speed: u32) -> Self {
         Self {
             options,
             registers: Registers::new(memory.reset_vector()),
@@ -1300,7 +1302,7 @@ impl Cpu {
         }
     }
 
-    pub fn with_nes_options(memory: MemoryMap, clock_speed: u32) -> Self {
+    pub fn with_nes_options(memory: CpuMemory, clock_speed: u32) -> Self {
         Self {
             options: NES_CPU_OPTIONS,
             registers: Registers::new(memory.reset_vector()),
@@ -1512,8 +1514,8 @@ impl Cpu {
 
 #[cfg(test)]
 mod test {
-    use crate::cpu::{Cpu, CpuOptions};
-    use crate::memory_map::MemoryMap;
+    use crate::cpu::Cpu;
+    use crate::cpu::cpu_memory::CpuMemory;
     use crate::nes_rom::NesRom;
     use std::fs::File;
     use std::io::{BufRead, BufReader};
@@ -1521,7 +1523,7 @@ mod test {
     #[test]
     fn nestest() {
         let rom = NesRom::read_from_file("./vendor/nestest/nestest.nes").unwrap();
-        let memory_map = MemoryMap::new(rom);
+        let memory_map = CpuMemory::new(rom);
         let mut cpu = Cpu::with_nes_options(memory_map, 1 << 16);
         cpu.registers.pc = 0xC000;
         cpu.registers.p = 0x24;

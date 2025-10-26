@@ -3,12 +3,12 @@ use std::io::Read;
 use std::fmt;
 
 #[derive(Debug)]
-pub enum NametableArrangement {
+pub enum NametableMirroring {
     Vertical,
     Horizontal,
 }
 
-impl NametableArrangement {
+impl NametableMirroring {
     fn from_bit(value: u8) -> Self {
         match value {
             0 => Self::Vertical,
@@ -45,7 +45,7 @@ pub struct NesRom {
     trainer: Option<[u8; TRAINER_SIZE]>,
     mapper: u8,
     alt_nametable: bool,
-    nametable_arrangement: NametableArrangement,
+    nametable_arrangement: NametableMirroring,
     battery_backed_prg_ram: bool,
     prg_ram_size: u8,
     tv_system: TvSystem,
@@ -60,7 +60,7 @@ impl fmt::Debug for NesRom {
             _has_trainer: bool,
             _mapper: &'a u8,
             _alt_nametable: &'a bool,
-            _nametable_arrangement: &'a NametableArrangement,
+            _nametable_arrangement: &'a NametableMirroring,
             _battery_backed_prg_ram: &'a bool,
             _prg_ram_size: &'a u8,
             _tv_system: &'a TvSystem,
@@ -111,7 +111,7 @@ impl NesRom {
         let flags7 = header[7];
         let mapper = (flags7 & 0xF0) | (flags6 >> 4);
         let alt_nametable = (flags6 >> 3) & 1 == 1;
-        let nametable_arrangement = NametableArrangement::from_bit(flags6 & 1);
+        let nametable_arrangement = NametableMirroring::from_bit(flags6 & 1);
         let has_trainer = (flags6 >> 2) & 1 == 1;
         let battery_backed_prg_ram = (flags6 >> 1) & 1 == 1;
         let prg_ram_size = header[8];
