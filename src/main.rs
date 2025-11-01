@@ -1,7 +1,7 @@
 mod cpu;
 mod nes_rom;
 mod ppu;
-mod ram;
+mod memory;
 
 use crate::nes_rom::NesRom;
 use crate::ppu::Ppu;
@@ -17,7 +17,7 @@ const COLORS: [Color; 4] = [BLACK, DARKGRAY, LIGHTGRAY, WHITE];
 async fn main() -> Result<(), anyhow::Error> {
     println!("Starting Emulator!");
 
-    let rom = NesRom::read_from_file("./tetris.nes")?;
+    let rom = NesRom::read_from_file("./dk.nes")?;
     println!("{rom:#?}");
 
     let memory_map = CpuMemory::new(rom.clone());

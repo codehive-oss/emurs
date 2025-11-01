@@ -1,5 +1,5 @@
 use crate::nes_rom::NesRom;
-use crate::ram::Ram;
+use crate::memory::{Memory, Ram};
 
 pub struct CpuMemory {
     sram: Ram,
