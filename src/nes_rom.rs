@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum NametableMirroring {
     Vertical,
     Horizontal,
@@ -18,7 +18,7 @@ impl NametableMirroring {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TvSystem {
     Ntsc,
     Pal,
@@ -39,13 +39,14 @@ const PRG_ROM_CHUNK_SIZE: usize = 16384;
 const CHR_ROM_CHUNK_SIZE: usize = 8192;
 const TRAINER_SIZE: usize = 512;
 
+#[derive(Clone)]
 pub struct NesRom {
     pub prg_rom: Vec<u8>,
-    chr_rom: Vec<u8>,
+    pub chr_rom: Vec<u8>,
     trainer: Option<[u8; TRAINER_SIZE]>,
     mapper: u8,
     alt_nametable: bool,
-    nametable_arrangement: NametableMirroring,
+    nametable_mirroring: NametableMirroring,
     battery_backed_prg_ram: bool,
     prg_ram_size: u8,
     tv_system: TvSystem,
@@ -72,7 +73,7 @@ impl fmt::Debug for NesRom {
             trainer,
             mapper,
             alt_nametable,
-            nametable_arrangement,
+            nametable_mirroring: nametable_arrangement,
             battery_backed_prg_ram: prg_ram,
             prg_ram_size,
             tv_system,
@@ -138,7 +139,7 @@ impl NesRom {
             trainer,
             mapper,
             alt_nametable,
-            nametable_arrangement,
+            nametable_mirroring: nametable_arrangement,
             battery_backed_prg_ram,
             prg_ram_size,
             tv_system,
