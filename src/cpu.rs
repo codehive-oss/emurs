@@ -171,7 +171,7 @@ impl Cpu {
         sleep(Duration::from_secs_f64(sec));
     }
 
-    fn read_memory(&self, a: u16) -> u8 {
+    fn read_memory(&mut self, a: u16) -> u8 {
         self.clock_cycle();
         self.memory.read(a)
     }

@@ -46,7 +46,7 @@ pub struct NesRom {
     trainer: Option<[u8; TRAINER_SIZE]>,
     mapper: u8,
     alt_nametable: bool,
-    nametable_mirroring: NametableMirroring,
+    pub nametable_mirroring: NametableMirroring,
     battery_backed_prg_ram: bool,
     prg_ram_size: u8,
     tv_system: TvSystem,

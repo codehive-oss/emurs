@@ -2,7 +2,7 @@ use crate::memory::Memory;
 use crate::nes_rom::NametableMirroring;
 use crate::ppu::ppu_memory::PpuMemory;
 
-mod ppu_memory;
+pub mod ppu_memory;
 
 struct PpuAddr {
     hi: u8,
@@ -41,13 +41,62 @@ impl PpuAddr {
     }
 }
 
+struct PpuScroll {
+    x: u8,
+    y: u8,
+    is_x: bool,
+}
+
+impl PpuScroll {
+    pub fn new() -> Self {
+        PpuScroll {
+            x: 0,
+            y: 0,
+            // TODO technically this should use the same latch as PPU_ADDR
+            is_x: true,
+        }
+    }
+
+    fn set(&mut self, value: u8) {
+        if self.is_x {
+            self.x = value;
+        } else {
+            self.y = value;
+        }
+
+        self.is_x = !self.is_x;
+    }
+
+    fn get_x(&self) -> u8 {
+        self.x
+    }
+
+    fn get_y(&self) -> u8 {
+        self.y
+    }
+}
+
 const PPU_CTRL_NAMETABLE_MASK: u8 = 0x3;
-const PPU_VRAM_ADD_INCREMENT_BIT: u8 = 2;
-const PPU_SPRITE_PATTERN_ADDR_BIT: u8 = 3;
-const PPU_BACKRGROUND_ADDR_BIT: u8 = 4;
-const PPU_SPRITE_SIZE_BIT: u8 = 5;
-const PPU_MASTER_SLAVE_SELECT_BIT: u8 = 6;
-const PPU_VBLANK_NMI_BIT: u8 = 7;
+const PPU_CTRL_VRAM_ADD_INCREMENT_BIT: u8 = 2;
+const PPU_CTRL_SPRITE_PATTERN_ADDR_BIT: u8 = 3;
+const PPU_CTRL_BACKRGROUND_ADDR_BIT: u8 = 4;
+const PPU_CTRL_SPRITE_SIZE_BIT: u8 = 5;
+const PPU_CTRL_MASTER_SLAVE_SELECT_BIT: u8 = 6;
+const PPU_CTRL_VBLANK_NMI_BIT: u8 = 7;
+
+const PPU_STATUS_SPRITE_OVERFLOW_BIT: u8 = 5;
+const PPU_STATUS_SPRITE_HIT_BIT: u8 = 6;
+const PPU_STATUS_VBLANK_BIT: u8 = 7;
+
+const PPU_MASK_GREYSCALE_BIT: u8 = 0;
+
+const PPU_MASK_SHOW_LEFTMOST_BACKGROUND_BIT: u8 = 1;
+const PPU_MASK_SHOW_LEFTMOST_SPRITES_BIT: u8 = 2;
+const PPU_MASK_BACKGROUND_RENDERING_BIT: u8 = 3;
+const PPU_MASK_SPRITE_RENDERING_BIT: u8 = 4;
+const PPU_MASK_RED_BIT: u8 = 5;
+const PPU_MASK_GREEN_BIT: u8 = 6;
+const PPU_MASK_BLUE_BIT: u8 = 7;
 
 pub struct Ppu<M: Memory> {
     ctrl: u8,
@@ -55,7 +104,7 @@ pub struct Ppu<M: Memory> {
     status: u8,
     oam_addr: u8,
     oam_data: u8,
-    scroll: u8,
+    scroll: PpuScroll,
     addr: PpuAddr,
     data_buffer: u8,
     oam_dma: u8,
@@ -71,7 +120,7 @@ impl Ppu<PpuMemory> {
             status: 0,
             oam_addr: 0,
             oam_data: 0,
-            scroll: 0,
+            scroll: PpuScroll::new(),
             addr: PpuAddr::new(),
             data_buffer: 0,
             oam_dma: 0,
@@ -88,12 +137,64 @@ impl<M: Memory> Ppu<M> {
             status: 0,
             oam_addr: 0,
             oam_data: 0,
-            scroll: 0,
+            scroll: PpuScroll::new(),
             addr: PpuAddr::new(),
             data_buffer: 0,
             oam_dma: 0,
             memory,
         }
+    }
+
+    pub fn write_ppu_ctrl(&mut self, value: u8) {
+        self.ctrl = value;
+    }
+
+    pub fn get_ctrl_bit(&self, bit: u8) -> bool {
+        self.ctrl >> bit & 1 == 1
+    }
+
+    pub fn set_ctrl_bit(&mut self, bit: u8, value: bool) {
+        if value {
+            self.ctrl |= 1 << bit;
+        } else {
+            self.ctrl &= !(1 << bit);
+        }
+    }
+
+    pub fn write_ppu_mask(&mut self, value: u8) {
+        self.mask = value;
+    }
+
+    pub fn get_mask_bit(&self, bit: u8) -> bool {
+        self.mask >> bit & 1 == 1
+    }
+
+    pub fn set_mask_bit(&mut self, bit: u8, value: bool) {
+        if value {
+            self.mask |= 1 << bit;
+        } else {
+            self.mask &= !(1 << bit);
+        }
+    }
+
+    pub fn read_ppu_status(&self) -> u8 {
+        self.status
+    }
+
+    pub fn get_status_bit(&self, bit: u8) -> bool {
+        self.status >> bit & 1 == 1
+    }
+
+    pub fn set_status_bit(&mut self, bit: u8, value: bool) {
+        if value {
+            self.status |= 1 << bit;
+        } else {
+            self.status &= !(1 << bit);
+        }
+    }
+
+    pub fn write_ppu_scroll(&mut self, value: u8) {
+        self.scroll.set(value);
     }
 
     pub fn write_ppu_addr(&mut self, value: u8) {
@@ -120,20 +221,8 @@ impl<M: Memory> Ppu<M> {
         self.addr.increment_addr(self.addr_increment_amount());
     }
 
-    pub fn get_ctrl_bit(&self, bit: u8) -> bool {
-        self.ctrl >> bit & 1 == 1
-    }
-
-    pub fn set_ctrl_bit(&mut self, bit: u8, value: bool) {
-        if value {
-            self.ctrl |= 1 << bit;
-        } else {
-            self.ctrl &= !(1 << bit);
-        }
-    }
-
     fn addr_increment_amount(&self) -> u8 {
-        if !self.get_ctrl_bit(PPU_VRAM_ADD_INCREMENT_BIT) {
+        if !self.get_ctrl_bit(PPU_CTRL_VRAM_ADD_INCREMENT_BIT) {
             1 // across
         } else {
             32 // down
@@ -144,7 +233,7 @@ impl<M: Memory> Ppu<M> {
 #[cfg(test)]
 mod test {
     use crate::memory::DummyMemory;
-    use crate::ppu::{Ppu, PPU_VRAM_ADD_INCREMENT_BIT};
+    use crate::ppu::{Ppu, PPU_CTRL_VRAM_ADD_INCREMENT_BIT};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -153,7 +242,7 @@ mod test {
         let memory = Rc::new(RefCell::new(DummyMemory::new()));
         let mut ppu = Ppu::new_with_memory(memory.clone());
 
-        ppu.set_ctrl_bit(PPU_VRAM_ADD_INCREMENT_BIT, false);
+        ppu.set_ctrl_bit(PPU_CTRL_VRAM_ADD_INCREMENT_BIT, false);
 
         ppu.write_ppu_addr(0x34);
         ppu.write_ppu_addr(0x56);
@@ -173,15 +262,16 @@ mod test {
         assert_eq!(memory.borrow().last_write_value(), 0xCA);
         assert_eq!(ppu.addr.get_addr(), 0x3459);
 
-        ppu.set_ctrl_bit(PPU_VRAM_ADD_INCREMENT_BIT, true);
+        ppu.set_ctrl_bit(PPU_CTRL_VRAM_ADD_INCREMENT_BIT, true);
         ppu.read_ppu_data();
         assert_eq!(ppu.addr.get_addr(), 0x3479); // now it increments by 0x20 because of the changed ctrl bit
-        ppu.set_ctrl_bit(PPU_VRAM_ADD_INCREMENT_BIT, false);
+        ppu.set_ctrl_bit(PPU_CTRL_VRAM_ADD_INCREMENT_BIT, false);
 
         ppu.addr.set(0x3f);
         ppu.addr.set(0xBD);
         assert_eq!(ppu.addr.get_addr(), 0x3fBD);
         assert_eq!(ppu.read_ppu_data(), 0xBD); // read in palette range returns value immediately
+        assert_eq!(ppu.addr.get_addr(), 0x3fBE);
 
         ppu.addr.set(0x3f);
         ppu.addr.set(0xff);

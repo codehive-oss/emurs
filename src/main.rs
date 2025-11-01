@@ -17,13 +17,13 @@ const COLORS: [Color; 4] = [BLACK, DARKGRAY, LIGHTGRAY, WHITE];
 async fn main() -> Result<(), anyhow::Error> {
     println!("Starting Emulator!");
 
-    let rom = NesRom::read_from_file("./dk.nes")?;
+    let rom = NesRom::read_from_file("./tetris.nes")?;
     println!("{rom:#?}");
 
-    let memory_map = CpuMemory::new(rom.clone());
+    let mut memory_map = CpuMemory::new(rom.clone());
     println!("Entry point: {:#X}", memory_map.reset_vector());
 
-    let mut cpu = Cpu::with_nes_options(memory_map, 1 << 16);
+    let cpu = Cpu::with_nes_options(memory_map, 1 << 16);
 
     debug_chr_rom(rom).await;
 

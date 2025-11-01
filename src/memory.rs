@@ -12,6 +12,10 @@ impl Ram {
     pub fn new(size: usize) -> Self {
         Self(vec![0; size])
     }
+    
+    pub fn size(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl Memory for Ram {
