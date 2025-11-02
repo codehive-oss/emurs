@@ -1,4 +1,5 @@
 use crate::cpu::controller::Controller;
+use crate::cpu::{INTERRUPT_VECTOR_RES_HI, INTERRUPT_VECTOR_RES_LO};
 use crate::memory::{Memory, Ram};
 use crate::nes_rom::NesRom;
 use crate::ppu::ppu_memory::PpuMemory;
@@ -6,11 +7,11 @@ use crate::ppu::Ppu;
 
 pub struct Bus {
     sram: Ram,
-    rom: NesRom,
+    pub rom: NesRom,
     prg_ram: Ram,
     pub ppu: Ppu<PpuMemory>,
     pub controller: Controller,
-    cycle: u32,
+    pub cycle: u32,
 }
 
 impl Bus {
@@ -103,8 +104,8 @@ impl Bus {
     }
 
     pub fn reset_vector(&self) -> u16 {
-        let hi = self.rom.prg_rom[(0xFFFD - 0x8000) % self.rom.prg_rom.len()] as u16;
-        let lo = self.rom.prg_rom[(0xFFFC - 0x8000) % self.rom.prg_rom.len()] as u16;
+        let hi = self.rom.prg_rom[(INTERRUPT_VECTOR_RES_HI - 0x8000) as usize % self.rom.prg_rom.len()] as u16;
+        let lo = self.rom.prg_rom[(INTERRUPT_VECTOR_RES_LO - 0x8000) as usize % self.rom.prg_rom.len()] as u16;
         (hi << 8) | lo
     }
 }

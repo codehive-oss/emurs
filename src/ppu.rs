@@ -122,7 +122,7 @@ pub struct Ppu<M: Memory> {
     oam_dma: u8,
 
     scanline: u32,
-    cycle: u32,
+    pub cycle: u32,
     nmi: bool,
     new_frame: bool,
 
@@ -151,25 +151,6 @@ impl Ppu<PpuMemory> {
 }
 
 impl<M: Memory> Ppu<M> {
-    fn new_with_memory(memory: M) -> Self {
-        Self {
-            ctrl: 0,
-            mask: 0,
-            status: 0,
-            oam_addr: 0,
-            oam_data: 0,
-            scroll: PpuScroll::new(),
-            addr: PpuAddr::new(),
-            data_buffer: 0,
-            oam_dma: 0,
-            scanline: 1,
-            cycle: 0,
-            nmi: false,
-            new_frame: false,
-            memory,
-        }
-    }
-
     pub fn tick(&mut self, delta: u32) {
         self.cycle += delta;
         while self.cycle > SCANLINE_CYCLES {
@@ -221,13 +202,7 @@ impl<M: Memory> Ppu<M> {
         self.ctrl >> bit & 1 == 1
     }
 
-    pub fn set_ctrl_bit(&mut self, bit: u8, value: bool) {
-        if value {
-            self.ctrl |= 1 << bit;
-        } else {
-            self.ctrl &= !(1 << bit);
-        }
-    }
+
 
     pub fn write_ppu_mask(&mut self, value: u8) {
         self.mask = value;
@@ -316,10 +291,40 @@ impl<M: Memory> Ppu<M> {
 
 #[cfg(test)]
 mod test {
-    use crate::memory::DummyMemory;
-    use crate::ppu::{Ppu, PPU_CTRL_VRAM_ADD_INCREMENT_BIT};
+    use crate::memory::{Memory};
+    use crate::ppu::{Ppu, PpuAddr, PpuScroll, PPU_CTRL_VRAM_ADD_INCREMENT_BIT};
     use std::cell::RefCell;
     use std::rc::Rc;
+    use crate::memory::test::DummyMemory;
+
+    impl<M: Memory> Ppu<M> {
+        fn new_with_memory(memory: M) -> Self {
+            Self {
+                ctrl: 0,
+                mask: 0,
+                status: 0,
+                oam_addr: 0,
+                oam_data: 0,
+                scroll: PpuScroll::new(),
+                addr: PpuAddr::new(),
+                data_buffer: 0,
+                oam_dma: 0,
+                scanline: 1,
+                cycle: 0,
+                nmi: false,
+                new_frame: false,
+                memory,
+            }
+        }
+
+        pub fn set_ctrl_bit(&mut self, bit: u8, value: bool) {
+            if value {
+                self.ctrl |= 1 << bit;
+            } else {
+                self.ctrl &= !(1 << bit);
+            }
+        }
+    }
 
     #[test]
     pub fn test_ppu_addr() {

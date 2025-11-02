@@ -144,16 +144,9 @@ const NES_CPU_OPTIONS: CpuOptions = CpuOptions {
     ignore_decimal_bit: true,
 };
 
+#[derive(Default)]
 pub struct CpuOptions {
     ignore_decimal_bit: bool,
-}
-
-impl Default for CpuOptions {
-    fn default() -> Self {
-        Self {
-            ignore_decimal_bit: false,
-        }
-    }
 }
 
 pub struct Cpu {
@@ -1296,15 +1289,6 @@ impl Cpu {
 }
 
 impl Cpu {
-    pub fn new(options: CpuOptions, memory: Bus, clock_speed: u32) -> Self {
-        Self {
-            options,
-            registers: Registers::new(),
-            bus: memory,
-            cycle: 0,
-            clock_speed,
-        }
-    }
 
     pub fn reset(&mut self) {
         self.registers.a = 0;
