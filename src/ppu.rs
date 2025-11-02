@@ -177,14 +177,16 @@ impl<M: Memory> Ppu<M> {
             self.scanline += 1;
 
             if self.scanline == VISIBLE_SCANLIENS + 1 {
+                self.set_status_bit(PPU_STATUS_VBLANK_BIT, true);
                 if self.get_ctrl_bit(PPU_CTRL_VBLANK_NMI_BIT) {
-                    self.set_status_bit(PPU_STATUS_VBLANK_BIT, true);
                     self.nmi = true;
                 }
             }
 
             if self.scanline > SCANLINES {
                 self.scanline = 0;
+                self.nmi = false;
+                self.set_status_bit(PPU_STATUS_SPRITE_HIT_BIT, false);
                 self.set_status_bit(PPU_STATUS_VBLANK_BIT, false);
                 self.new_frame = true;
             }
@@ -306,7 +308,7 @@ impl<M: Memory> Ppu<M> {
             0x0
         }
     }
-    
+
     pub fn base_nametable_index(&self) -> u8 {
         self.ctrl & PPU_CTRL_NAMETABLE_MASK
     }

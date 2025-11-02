@@ -19,7 +19,7 @@ async fn main() -> Result<(), anyhow::Error> {
     println!("Starting Emulator!");
 
     // let rom = NesRom::read_from_file("./vendor/nestest/nestest.nes")?;
-    let rom = NesRom::read_from_file("./tetris.nes")?;
+    let rom = NesRom::read_from_file("./pacman.nes")?;
     println!("{rom:#?}");
 
     let mut memory_map = Bus::new(rom.clone());
@@ -36,13 +36,12 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // debug_chr_rom(rom).await;
-
-    Ok(())
+    //
+    // Ok(())
 }
 
 async fn render_frame(cpu: &mut Cpu) {
     let ppu = &mut cpu.bus.ppu;
-    let vram = &ppu.memory.vram;
     let bank = ppu.background_pattern_addr();
 
     request_new_screen_size(

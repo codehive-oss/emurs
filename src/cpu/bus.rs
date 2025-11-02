@@ -91,5 +91,5 @@ impl Bus {
         let lo = self.rom.prg_rom[(0xFFFC - 0x8000) % self.rom.prg_rom.len()] as u16;
         (hi << 8) | lo
     }
-    
+
 }
