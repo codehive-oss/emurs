@@ -1,3 +1,4 @@
+use crate::cpu::controller::Controller;
 use crate::memory::{Memory, Ram};
 use crate::nes_rom::NesRom;
 use crate::ppu::ppu_memory::PpuMemory;
@@ -8,6 +9,7 @@ pub struct Bus {
     rom: NesRom,
     prg_ram: Ram,
     pub ppu: Ppu<PpuMemory>,
+    pub controller: Controller,
     cycle: u32,
 }
 
@@ -18,6 +20,7 @@ impl Bus {
             rom: rom.clone(),
             prg_ram: Ram::new(0x2000),
             ppu: Ppu::new(rom.chr_rom, rom.nametable_mirroring),
+            controller: Controller::new(),
             cycle: 0,
         }
     }
@@ -50,10 +53,12 @@ impl Bus {
                     a, register
                 ),
             }
-        } else if a == 0x4016 || a == 0x4017 {
-            // TODO
+        } else if a == 0x4016  {
+            self.controller.read()
+        } else if a == 0x4017 {
+            // TODO player 2 controller
             0
-        } else if (0x6000..0x8000).contains(&a) {
+        }else if (0x6000..0x8000).contains(&a) {
             self.prg_ram.read(a - 0x6000)
         } else if a >= 0x8000 {
             self.rom.prg_rom[(a as usize - 0x8000) % self.rom.prg_rom.len()]
@@ -86,7 +91,9 @@ impl Bus {
             };
         } else if a == 0x4014 {
             // unimplemented!()
-        } else if (0x4000..=0x4017).contains(&a) {
+        } else if a == 0x4016 {
+            self.controller.write(v);
+        }else if (0x4000..=0x4017).contains(&a) {
             // TODO APU
         } else if (0x6000..0x8000).contains(&a) {
             self.prg_ram.write(a - 0x6000, v);

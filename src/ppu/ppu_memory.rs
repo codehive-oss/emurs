@@ -57,7 +57,7 @@ impl Memory for PpuMemory {
 
     fn write(&mut self, addr: u16, data: u8) {
         if addr < 0x2000 {
-            panic!("Attempted write to CHR ROM at {:#X}", addr);
+            // panic!("Attempted write to CHR ROM at {:#X}", addr);
         } else if (0x2000..0x3000).contains(&addr) {
             let vram_addr = addr - 0x2000;
             self.vram.write(self.mirror_vram_addr(vram_addr), data);

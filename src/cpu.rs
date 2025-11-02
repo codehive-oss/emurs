@@ -4,6 +4,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 pub mod bus;
+pub mod controller;
 
 const STATUS_NEGATIVE_BIT: u32 = 7;
 const STATUS_OVERFLOW_BIT: u32 = 6;

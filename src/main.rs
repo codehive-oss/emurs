@@ -3,6 +3,11 @@ mod memory;
 mod nes_rom;
 mod ppu;
 
+use crate::cpu::controller::{
+    CONTROLLER_BUTTON_A, CONTROLLER_BUTTON_B, CONTROLLER_BUTTON_DOWN, CONTROLLER_BUTTON_LEFT,
+    CONTROLLER_BUTTON_RIGHT, CONTROLLER_BUTTON_SELECT, CONTROLLER_BUTTON_START,
+    CONTROLLER_BUTTON_UP,
+};
 use crate::memory::Memory;
 use crate::nes_rom::NesRom;
 use crate::ppu::ppu_memory::PpuMemory;
@@ -19,7 +24,7 @@ async fn main() -> Result<(), anyhow::Error> {
     println!("Starting Emulator!");
 
     // let rom = NesRom::read_from_file("./vendor/nestest/nestest.nes")?;
-    let rom = NesRom::read_from_file("./pacman.nes")?;
+    let rom = NesRom::read_from_file("./dk.nes")?;
     println!("{rom:#?}");
 
     let mut memory_map = Bus::new(rom.clone());
@@ -32,12 +37,24 @@ async fn main() -> Result<(), anyhow::Error> {
             render_frame(&mut cpu).await;
             println!("frame");
         }
-        cpu.tick()
+        cpu.tick();
+        handle_keyboard_input(&mut cpu);
     }
 
     // debug_chr_rom(rom).await;
 
     // Ok(())
+}
+
+fn handle_keyboard_input(cpu: &mut Cpu) {
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_A] = is_key_down(KeyCode::A);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_B] = is_key_down(KeyCode::S);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_SELECT] = is_key_down(KeyCode::LeftShift);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_START] = is_key_down(KeyCode::Enter);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_UP] = is_key_down(KeyCode::Up);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_DOWN] = is_key_down(KeyCode::Down);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_LEFT] = is_key_down(KeyCode::Left);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_RIGHT] = is_key_down(KeyCode::Right);
 }
 
 const SYSTEM_PALLETE: [u32; 64] = [
