@@ -170,9 +170,9 @@ impl<M: Memory> Ppu<M> {
         }
     }
 
-    pub fn tick(&mut self, cycle: u32) {
-        self.cycle = cycle;
-        if self.cycle > SCANLINE_CYCLES {
+    pub fn tick(&mut self, delta: u32) {
+        self.cycle += delta;
+        while self.cycle > SCANLINE_CYCLES {
             self.cycle -= SCANLINE_CYCLES;
             self.scanline += 1;
 
