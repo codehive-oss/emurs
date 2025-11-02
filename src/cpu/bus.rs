@@ -3,21 +3,37 @@ use crate::nes_rom::NesRom;
 use crate::ppu::ppu_memory::PpuMemory;
 use crate::ppu::Ppu;
 
-pub struct CpuMemory {
+pub struct Bus {
     sram: Ram,
     rom: NesRom,
     prg_ram: Ram,
-    ppu: Ppu<PpuMemory>,
+    pub ppu: Ppu<PpuMemory>,
+    cycle: u32
 }
 
-impl CpuMemory {
+impl Bus {
+
     pub fn new(rom: NesRom) -> Self {
         Self {
             sram: Ram::new(0x8000),
             rom: rom.clone(),
             prg_ram: Ram::new(0x2000),
             ppu: Ppu::new(rom.chr_rom, rom.nametable_mirroring),
+            cycle: 0
         }
+    }
+
+    pub fn tick(&mut self, cycle: u32) {
+        self.cycle = cycle;
+        self.ppu.tick(cycle * 3);
+    }
+
+    pub fn poll_nmi(&mut self) -> bool{
+       self.ppu.poll_nmi()
+    }
+
+    pub fn poll_new_frame(&mut self) -> bool{
+        self.ppu.poll_new_frame()
     }
 
     pub fn read(&mut self, a: u16) -> u8 {
@@ -75,4 +91,5 @@ impl CpuMemory {
         let lo = self.rom.prg_rom[(0xFFFC - 0x8000) % self.rom.prg_rom.len()] as u16;
         (hi << 8) | lo
     }
+    
 }

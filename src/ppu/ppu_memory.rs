@@ -2,8 +2,8 @@ use crate::memory::{Memory, Ram};
 use crate::nes_rom::NametableMirroring;
 
 pub struct PpuMemory {
-    chr_rom: Vec<u8>,
-    vram: Ram,
+    pub chr_rom: Vec<u8>,
+    pub vram: Ram,
     mirroring: NametableMirroring,
     palette_table: Ram,
 }

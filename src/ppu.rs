@@ -39,6 +39,10 @@ impl PpuAddr {
         self.hi = (new_addr >> 8) as u8;
         self.lo = (new_addr & 0xFF) as u8;
     }
+
+    pub fn reset_latch(&mut self) {
+        self.is_hi = true;
+    }
 }
 
 struct PpuScroll {
@@ -74,6 +78,10 @@ impl PpuScroll {
     fn get_y(&self) -> u8 {
         self.y
     }
+
+    pub fn reset_latch(&mut self) {
+        self.is_x = true;
+    }
 }
 
 const PPU_CTRL_NAMETABLE_MASK: u8 = 0x3;
@@ -98,6 +106,10 @@ const PPU_MASK_RED_BIT: u8 = 5;
 const PPU_MASK_GREEN_BIT: u8 = 6;
 const PPU_MASK_BLUE_BIT: u8 = 7;
 
+const SCANLINES: u32 = 262;
+const VISIBLE_SCANLIENS: u32 = 240;
+const SCANLINE_CYCLES: u32 = 341;
+
 pub struct Ppu<M: Memory> {
     ctrl: u8,
     mask: u8,
@@ -109,7 +121,12 @@ pub struct Ppu<M: Memory> {
     data_buffer: u8,
     oam_dma: u8,
 
-    memory: M,
+    scanline: u32,
+    cycle: u32,
+    nmi: bool,
+    new_frame: bool,
+
+    pub memory: M,
 }
 
 impl Ppu<PpuMemory> {
@@ -124,6 +141,10 @@ impl Ppu<PpuMemory> {
             addr: PpuAddr::new(),
             data_buffer: 0,
             oam_dma: 0,
+            scanline: 1,
+            cycle: 0,
+            nmi: false,
+            new_frame: false,
             memory: PpuMemory::new(chr_rom, mirroring),
         }
     }
@@ -141,12 +162,57 @@ impl<M: Memory> Ppu<M> {
             addr: PpuAddr::new(),
             data_buffer: 0,
             oam_dma: 0,
+            scanline: 1,
+            cycle: 0,
+            nmi: false,
+            new_frame: false,
             memory,
         }
     }
 
+    pub fn tick(&mut self, cycle: u32) {
+        self.cycle = cycle;
+        if self.cycle > SCANLINE_CYCLES {
+            self.cycle -= SCANLINE_CYCLES;
+            self.scanline += 1;
+
+            if self.scanline == VISIBLE_SCANLIENS + 1 {
+                if self.get_ctrl_bit(PPU_CTRL_VBLANK_NMI_BIT) {
+                    self.set_status_bit(PPU_STATUS_VBLANK_BIT, true);
+                    self.nmi = true;
+                }
+            }
+
+            if self.scanline > SCANLINES {
+                self.scanline = 0;
+                self.set_status_bit(PPU_STATUS_VBLANK_BIT, false);
+                self.new_frame = true;
+            }
+        }
+    }
+
+    pub fn poll_nmi(&mut self) -> bool {
+        let value = self.nmi;
+        self.nmi = false;
+        value
+    }
+
+    pub fn poll_new_frame(&mut self) -> bool {
+        let value = self.new_frame;
+        self.new_frame = false;
+        value
+    }
+
+    pub fn is_vblank(&self) -> bool {
+        self.get_status_bit(PPU_STATUS_VBLANK_BIT)
+    }
+
     pub fn write_ppu_ctrl(&mut self, value: u8) {
+        let old_nmi = self.get_ctrl_bit(PPU_CTRL_VBLANK_NMI_BIT);
         self.ctrl = value;
+        if !old_nmi && self.get_ctrl_bit(PPU_CTRL_VBLANK_NMI_BIT) && self.is_vblank() {
+            self.nmi = true;
+        }
     }
 
     pub fn get_ctrl_bit(&self, bit: u8) -> bool {
@@ -177,8 +243,12 @@ impl<M: Memory> Ppu<M> {
         }
     }
 
-    pub fn read_ppu_status(&self) -> u8 {
-        self.status
+    pub fn read_ppu_status(&mut self) -> u8 {
+        let value = self.status;
+        self.set_status_bit(PPU_STATUS_VBLANK_BIT, false);
+        self.addr.reset_latch();
+        self.scroll.reset_latch();
+        value
     }
 
     pub fn get_status_bit(&self, bit: u8) -> bool {
@@ -227,6 +297,18 @@ impl<M: Memory> Ppu<M> {
         } else {
             32 // down
         }
+    }
+
+    pub fn background_pattern_addr(&self) -> u16 {
+        if self.get_ctrl_bit(PPU_CTRL_BACKRGROUND_ADDR_BIT) {
+            0x1000
+        } else {
+            0x0
+        }
+    }
+    
+    pub fn base_nametable_index(&self) -> u8 {
+        self.ctrl & PPU_CTRL_NAMETABLE_MASK
     }
 }
 

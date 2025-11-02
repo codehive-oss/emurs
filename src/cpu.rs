@@ -1,9 +1,9 @@
-use cpu_memory::CpuMemory;
+use bus::Bus;
 use std::fmt;
 use std::thread::sleep;
 use std::time::Duration;
 
-pub mod cpu_memory;
+pub mod bus;
 
 const STATUS_NEGATIVE_BIT: u32 = 7;
 const STATUS_OVERFLOW_BIT: u32 = 6;
@@ -51,13 +51,13 @@ impl fmt::Display for Registers {
 }
 
 impl Registers {
-    fn new(entrypoint: u16) -> Self {
+    fn new() -> Self {
         Self {
             a: 0,
             x: 0,
             y: 0,
             s: 0,
-            pc: entrypoint,
+            pc: 0,
             p: 0,
         }
     }
@@ -158,27 +158,29 @@ impl Default for CpuOptions {
 pub struct Cpu {
     options: CpuOptions,
     registers: Registers,
-    memory: CpuMemory,
+    pub bus: Bus,
     clock_speed: u32,
+    cycle: u32,
 }
 
 impl Cpu {
-    fn clock_cycle(&self) {
+    fn clock_cycle(&mut self) {
         if self.clock_speed == 0 {
             return;
         }
+        self.cycle += 1;
         let sec: f64 = 1.0 / f64::from(self.clock_speed);
         sleep(Duration::from_secs_f64(sec));
     }
 
     fn read_memory(&mut self, a: u16) -> u8 {
         self.clock_cycle();
-        self.memory.read(a)
+        self.bus.read(a)
     }
 
     fn write_memory(&mut self, a: u16, v: u8) {
         self.clock_cycle();
-        self.memory.write(a, v)
+        self.bus.write(a, v)
     }
 
     fn next(&mut self) -> u8 {
@@ -1293,35 +1295,71 @@ impl Cpu {
 }
 
 impl Cpu {
-    pub fn new(options: CpuOptions, memory: CpuMemory, clock_speed: u32) -> Self {
+    pub fn new(options: CpuOptions, memory: Bus, clock_speed: u32) -> Self {
         Self {
             options,
-            registers: Registers::new(memory.reset_vector()),
-            memory,
+            registers: Registers::new(),
+            bus: memory,
+            cycle: 0,
             clock_speed,
         }
     }
 
-    pub fn with_nes_options(memory: CpuMemory, clock_speed: u32) -> Self {
+    pub fn reset(&mut self) {
+        self.registers.a = 0;
+        self.registers.x = 0;
+        self.registers.y = 0;
+        self.registers.s = 0xfd;
+        self.registers.p = 0b100100;
+        self.registers.pc = self.bus.reset_vector();
+    }
+
+    pub fn with_nes_options(memory: Bus, clock_speed: u32) -> Self {
         Self {
             options: NES_CPU_OPTIONS,
-            registers: Registers::new(memory.reset_vector()),
-            memory,
+            registers: Registers::new(),
+            bus: memory,
+            cycle: 0,
             clock_speed,
         }
     }
 
-    pub fn run(&mut self) {
-        loop {
-            self.step();
+    pub fn tick(&mut self) {
+        if self.bus.poll_nmi() {
+            self.interrupt_nmi();
         }
+        self.step();
+        self.bus.tick(self.cycle);
+    }
+
+    pub fn poll_new_frame(&mut self) -> bool {
+        self.bus.poll_new_frame()
+    }
+
+    fn interrupt_nmi(&mut self) {
+        println!("NMI");
+        self.push_stack((self.registers.pc >> 8) as u8);
+        self.push_stack((self.registers.pc & 0xFF) as u8);
+
+        self.registers.update_status_bit(STATUS_BREAK_BIT, true);
+        self.registers.update_status_bit(STATUS_IGNORED_BIT, true);
+        self.push_stack(self.registers.p);
+
+        self.registers.update_interupt_bit(true);
+        self.registers.pc = self.interrupt_vector();
+    }
+
+    fn interrupt_vector(&mut self) -> u16 {
+        let hi = self.read_memory(INTERRUPT_VECTOR_NMI_HI) as u16;
+        let lo = self.read_memory(INTERRUPT_VECTOR_NMI_LO) as u16;
+        (hi << 8) | lo
     }
 
     pub fn step(&mut self) {
-        println!("{}", self.registers);
+        // println!("{}", self.registers);
         let instruction = self.next();
-        println!("interpreting {instruction:2X}");
-        println!();
+        // println!("interpreting {instruction:2X}");
+        // println!();
 
         match instruction {
             0xEA => self.nop(),
@@ -1514,8 +1552,8 @@ impl Cpu {
 
 #[cfg(test)]
 mod test {
+    use crate::cpu::bus::Bus;
     use crate::cpu::Cpu;
-    use crate::cpu::cpu_memory::CpuMemory;
     use crate::nes_rom::NesRom;
     use std::fs::File;
     use std::io::{BufRead, BufReader};
@@ -1523,11 +1561,11 @@ mod test {
     #[test]
     fn nestest() {
         let rom = NesRom::read_from_file("./vendor/nestest/nestest.nes").unwrap();
-        let memory_map = CpuMemory::new(rom);
+        let memory_map = Bus::new(rom);
         let mut cpu = Cpu::with_nes_options(memory_map, 1 << 16);
+        cpu.reset();
         cpu.registers.pc = 0xC000;
-        cpu.registers.p = 0x24;
-        cpu.registers.s = 0xFD;
+
 
         let reference_log = File::open("./vendor/nestest/nestest.log").unwrap();
         let mut idx = 1;
