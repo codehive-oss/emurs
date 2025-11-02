@@ -833,7 +833,7 @@ impl Cpu {
         let hi = self.next();
         let data = u16::from(lo) | (u16::from(hi) << 8);
         if data == instr_addr {
-            panic!("Trapped at {:#x}", instr_addr);
+            // panic!("Trapped at {:#x}", instr_addr);
         }
         self.registers.pc = data;
     }

@@ -58,7 +58,9 @@ impl Bus {
         } else if a >= 0x8000 {
             self.rom.prg_rom[(a as usize - 0x8000) % self.rom.prg_rom.len()]
         } else {
-            panic!("Tried to read unmapped address: {:#X}", a)
+            println!("Tried to read unmapped address: {:#X}", a);
+            0
+            // panic!("Tried to read unmapped address: {:#X}", a)
         }
     }
 

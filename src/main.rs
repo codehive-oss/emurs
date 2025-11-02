@@ -5,6 +5,7 @@ mod ppu;
 
 use crate::memory::Memory;
 use crate::nes_rom::NesRom;
+use crate::ppu::ppu_memory::PpuMemory;
 use crate::ppu::Ppu;
 use cpu::bus::Bus;
 use cpu::Cpu;
@@ -12,7 +13,6 @@ use macroquad::prelude::*;
 
 const RENDER_SCALE: f32 = 4.;
 const TILE_SIZE: f32 = RENDER_SCALE * 8.;
-const COLORS: [Color; 4] = [BLACK, DARKGRAY, LIGHTGRAY, WHITE];
 
 #[macroquad::main("emurs")]
 async fn main() -> Result<(), anyhow::Error> {
@@ -30,14 +30,38 @@ async fn main() -> Result<(), anyhow::Error> {
     loop {
         if cpu.poll_new_frame() {
             render_frame(&mut cpu).await;
-            println!("frame")
+            println!("frame");
         }
         cpu.tick()
     }
 
     // debug_chr_rom(rom).await;
-    //
+
     // Ok(())
+}
+
+const SYSTEM_PALLETE: [u32; 64] = [
+    0x808080, 0x003DA6, 0x0012B0, 0x440096, 0xA1005E, 0xC70028, 0xBA0600, 0x8C1700, 0x5C2F00,
+    0x104500, 0x054A00, 0x00472E, 0x004166, 0x000000, 0x050505, 0x050505, 0xC7C7C7, 0x0077FF,
+    0x2155FF, 0x8237FA, 0xEB2FB5, 0xFF2950, 0xFF2200, 0xD63200, 0xC46200, 0x358000, 0x058F00,
+    0x008A55, 0x0099CC, 0x212121, 0x090909, 0x090909, 0xFFFFFF, 0x0FD7FF, 0x69A2FF, 0xD480FF,
+    0xFF45F3, 0xFF618B, 0xFF8833, 0xFF9C12, 0xFABC20, 0x9FE30E, 0x2BF035, 0x0CF0A4, 0x05FBFF,
+    0x5E5E5E, 0x0D0D0D, 0x0D0D0D, 0xFFFFFF, 0xA6FCFF, 0xB3ECFF, 0xDAABEB, 0xFFA8F9, 0xFFABB3,
+    0xFFD2B0, 0xFFEFA6, 0xFFF79C, 0xD7E895, 0xA6EDAF, 0xA2F2DA, 0x99FFFC, 0xDDDDDD, 0x111111,
+    0x111111,
+];
+
+pub fn get_color(idx: u8) -> Color {
+    Color::from_hex(SYSTEM_PALLETE[idx as usize])
+}
+
+pub fn get_palette(ppu: &Ppu<PpuMemory>, palette_idx: u16) -> [Color; 4] {
+    [
+        get_color(ppu.memory.palette_table.read(0)),
+        get_color(ppu.memory.palette_table.read(palette_idx * 4 + 1)),
+        get_color(ppu.memory.palette_table.read(palette_idx * 4 + 2)),
+        get_color(ppu.memory.palette_table.read(palette_idx * 4 + 3)),
+    ]
 }
 
 async fn render_frame(cpu: &mut Cpu) {
@@ -62,12 +86,28 @@ async fn render_frame(cpu: &mut Cpu) {
     }
 
     for tile_index in 0..32 * 30 {
-        let nametable_addr = (0x2000 + (ppu.base_nametable_index() as u16 * 0x400)) + tile_index;
-        let tile = ppu.memory.read(nametable_addr) as u16;
+        let nametable_addr = (0x2000 + (ppu.base_nametable_index() as u16 * 0x400));
+        // which tile are we rendering?
+        let tile = ppu.memory.read(nametable_addr + tile_index) as u16;
         let chr_data = ppu.memory.chr_rom
             [(bank + tile * 16) as usize..=(bank + tile * 16 + 15) as usize]
             .to_vec();
         let pixels = chr_data_to_pixels(chr_data);
+
+        // which palette should be used?
+        let tile_x = tile_index % 32;
+        let tile_y = tile_index / 32;
+        let attr_table_idx = tile_x / 4 + tile_y / 4 * 8;
+        let meta_palette = ppu.memory.read(nametable_addr + 0x3c0 + attr_table_idx) as u16;
+        let palette_idx = match (tile_x % 2, tile_y % 2) {
+            (0, 0) => meta_palette & 0b11,
+            (1, 0) => (meta_palette >> 2) & 0b11,
+            (0, 1) => (meta_palette >> 4) & 0b11,
+            (1, 1) => (meta_palette >> 6) & 0b11,
+            _ => panic!("unexpected tile position"),
+        };
+        let colors = get_palette(&ppu, palette_idx);
+
         for i in 0..pixels.len() {
             let (screen_x, screen_y) = calc_screen_pos(tile_index as usize, i);
             draw_rectangle(
@@ -75,7 +115,7 @@ async fn render_frame(cpu: &mut Cpu) {
                 screen_y,
                 RENDER_SCALE,
                 RENDER_SCALE,
-                COLORS[pixels[i] as usize],
+                colors[pixels[i] as usize],
             )
         }
     }
@@ -99,6 +139,8 @@ async fn debug_chr_rom(rom: NesRom) {
         let screen_y = base_y + pixel_y * RENDER_SCALE;
         (screen_x, screen_y)
     }
+
+    const COLORS: [Color; 4] = [BLACK, RED, BLUE, WHITE];
 
     let chr_rom = rom.chr_rom;
     loop {

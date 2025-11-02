@@ -5,7 +5,7 @@ pub struct PpuMemory {
     pub chr_rom: Vec<u8>,
     pub vram: Ram,
     mirroring: NametableMirroring,
-    palette_table: Ram,
+    pub palette_table: Ram,
 }
 
 impl PpuMemory {
