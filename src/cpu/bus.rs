@@ -17,7 +17,7 @@ pub struct Bus {
 impl Bus {
     pub fn new(rom: NesRom) -> Self {
         Self {
-            sram: Ram::new(0x8000),
+            sram: Ram::new(0x800),
             rom: rom.clone(),
             prg_ram: Ram::new(0x2000),
             ppu: Ppu::new(rom.chr_rom, rom.nametable_mirroring),
