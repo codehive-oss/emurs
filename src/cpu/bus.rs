@@ -3,7 +3,7 @@ use crate::cpu::{INTERRUPT_VECTOR_RES_HI, INTERRUPT_VECTOR_RES_LO};
 use crate::memory::{Memory, Ram};
 use crate::nes_rom::NesRom;
 use crate::ppu::ppu_memory::PpuMemory;
-use crate::ppu::Ppu;
+use crate::ppu::{Ppu, OAM_SIZE};
 
 pub struct Bus {
     sram: Ram,
@@ -47,26 +47,25 @@ impl Bus {
             let register = (a - 0x2000) % 8;
             match register {
                 2 => self.ppu.read_ppu_status(),
-                4 => unimplemented!(),
+                4 => self.ppu.read_oam_data(),
                 7 => self.ppu.read_ppu_data(),
                 _ => panic!(
                     "Unexpected PPU register read: {:#X} (Register {})",
                     a, register
                 ),
             }
-        } else if a == 0x4016  {
+        } else if a == 0x4016 {
             self.controller.read()
         } else if a == 0x4017 {
             // TODO player 2 controller
             0
-        }else if (0x6000..0x8000).contains(&a) {
+        } else if (0x6000..0x8000).contains(&a) {
             self.prg_ram.read(a - 0x6000)
         } else if a >= 0x8000 {
             self.rom.prg_rom[(a as usize - 0x8000) % self.rom.prg_rom.len()]
         } else {
             println!("Tried to read unmapped address: {:#X}", a);
             0
-            // panic!("Tried to read unmapped address: {:#X}", a)
         }
     }
 
@@ -78,10 +77,8 @@ impl Bus {
             match register {
                 0 => self.ppu.write_ppu_ctrl(v),
                 1 => self.ppu.write_ppu_mask(v),
-                3 => {
-                    // unimplemented!()
-                }
-                4 => unimplemented!(),
+                3 => self.ppu.write_oam_addr(v),
+                4 => self.ppu.write_oam_data(v),
                 5 => self.ppu.write_ppu_scroll(v),
                 6 => self.ppu.write_ppu_addr(v),
                 7 => self.ppu.write_ppu_data(v),
@@ -91,10 +88,14 @@ impl Bus {
                 ),
             };
         } else if a == 0x4014 {
-            // unimplemented!()
+            for i in 0..OAM_SIZE {
+                let addr = ((v as u16) << 8) | (i as u16);
+                let value = self.read(addr);
+                self.ppu.write_oam_data(value);
+            }
         } else if a == 0x4016 {
             self.controller.write(v);
-        }else if (0x4000..=0x4017).contains(&a) {
+        } else if (0x4000..=0x4017).contains(&a) {
             // TODO APU
         } else if (0x6000..0x8000).contains(&a) {
             self.prg_ram.write(a - 0x6000, v);
@@ -104,8 +105,12 @@ impl Bus {
     }
 
     pub fn reset_vector(&self) -> u16 {
-        let hi = self.rom.prg_rom[(INTERRUPT_VECTOR_RES_HI - 0x8000) as usize % self.rom.prg_rom.len()] as u16;
-        let lo = self.rom.prg_rom[(INTERRUPT_VECTOR_RES_LO - 0x8000) as usize % self.rom.prg_rom.len()] as u16;
+        let hi = self.rom.prg_rom
+            [(INTERRUPT_VECTOR_RES_HI - 0x8000) as usize % self.rom.prg_rom.len()]
+            as u16;
+        let lo = self.rom.prg_rom
+            [(INTERRUPT_VECTOR_RES_LO - 0x8000) as usize % self.rom.prg_rom.len()]
+            as u16;
         (hi << 8) | lo
     }
 }

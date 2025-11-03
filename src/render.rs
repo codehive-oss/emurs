@@ -1,10 +1,16 @@
+mod sprite;
+
 use crate::cpu::Cpu;
 use crate::memory::Memory;
 use crate::nes_rom::NesRom;
 use crate::ppu::ppu_memory::PpuMemory;
-use crate::ppu::Ppu;
+use crate::ppu::{Ppu, OAM_SIZE};
+use crate::render::sprite::Sprite;
 use macroquad::color::{Color, BLACK, BLUE, RED, WHITE};
 use macroquad::prelude::{draw_rectangle, next_frame, request_new_screen_size};
+
+const SCREEN_WIDTH: u16 = 256;
+const SCREEN_HEIGHT: u16 = 240;
 
 const RENDER_SCALE: f32 = 4.;
 const TILE_SIZE: f32 = RENDER_SCALE * 8.;
@@ -21,10 +27,10 @@ const SYSTEM_PALLETE: [u32; 64] = [
 ];
 
 pub fn get_color(idx: u8) -> Color {
-    Color::from_hex(SYSTEM_PALLETE[idx as usize])
+    Color::from_hex(SYSTEM_PALLETE[idx as usize % 64])
 }
 
-pub fn get_palette(ppu: &Ppu<PpuMemory>, palette_idx: u16) -> [Color; 4] {
+pub fn get_bg_palette(ppu: &Ppu<PpuMemory>, palette_idx: u16) -> [Color; 4] {
     [
         get_color(ppu.memory.palette_table.read(0)),
         get_color(ppu.memory.palette_table.read(palette_idx * 4 + 1)),
@@ -33,14 +39,26 @@ pub fn get_palette(ppu: &Ppu<PpuMemory>, palette_idx: u16) -> [Color; 4] {
     ]
 }
 
+pub fn get_sprite_palette(ppu: &Ppu<PpuMemory>, palette_idx: u16) -> [Color; 4] {
+    get_bg_palette(ppu, palette_idx + 4)
+}
+
 pub async fn render_frame(cpu: &mut Cpu) {
     let ppu = &mut cpu.bus.ppu;
-    let bank = ppu.background_pattern_addr();
 
     request_new_screen_size(
         RENDER_SCALE * (8 * 32) as f32,
         RENDER_SCALE * (8 * 30) as f32,
     );
+
+    render_background(ppu).await;
+    render_sprites(ppu).await;
+
+    next_frame().await
+}
+
+async fn render_background(ppu: &mut Ppu<PpuMemory>) {
+    let bank = ppu.background_pattern_addr();
 
     fn calc_screen_pos(tile_index: usize, pixel_index: usize) -> (f32, f32) {
         let tile_x = (tile_index % 32) as f32;
@@ -59,7 +77,7 @@ pub async fn render_frame(cpu: &mut Cpu) {
         // which tile are we rendering?
         let tile = ppu.memory.read(nametable_addr + tile_index) as u16;
         let chr_data = ppu.memory.chr_rom
-            [(bank + tile * 16) as usize..=(bank + tile * 16 + 15) as usize]
+            [(bank + tile * 16) as usize..(bank + tile * 16 + 16) as usize]
             .to_vec();
         let pixels = chr_data_to_pixels(chr_data);
 
@@ -75,7 +93,7 @@ pub async fn render_frame(cpu: &mut Cpu) {
             (1, 1) => (meta_palette >> 6) & 0b11,
             _ => panic!("unexpected tile position"),
         };
-        let colors = get_palette(ppu, palette_idx);
+        let colors = get_bg_palette(ppu, palette_idx);
 
         for i in 0..pixels.len() {
             let (screen_x, screen_y) = calc_screen_pos(tile_index as usize, i);
@@ -88,7 +106,48 @@ pub async fn render_frame(cpu: &mut Cpu) {
             )
         }
     }
-    next_frame().await
+}
+
+async fn render_sprites(ppu: &Ppu<PpuMemory>) {
+    for oam_idx in (0..OAM_SIZE).step_by(4).rev() {
+        let sprite = Sprite::from_data(&ppu.oam[oam_idx..oam_idx + 4]);
+        if !sprite.visible {
+            continue;
+        }
+        let bank = ppu.sprite_pattern_addr();
+        let tile = sprite.tile_index as u16;
+        let chr_data = ppu.memory.chr_rom
+            [(bank + tile * 16) as usize..(bank + tile * 16 + 16) as usize]
+            .to_vec();
+        let pixels = chr_data_to_pixels(chr_data);
+
+        let colors = get_sprite_palette(ppu, sprite.palette as u16);
+
+        for x in 0..8 {
+            for y in 0..8 {
+                let pixel_idx = (y * 8 + x) as usize;
+                if pixels[pixel_idx] == 0 {
+                    continue;
+                }
+
+                let x = if sprite.flip_horizontally { 7 - x } else { x };
+                let y = if sprite.flip_vertically { 7 - y } else { y };
+
+                if sprite.x as u16 + x > SCREEN_WIDTH || sprite.y as u16 + y > SCREEN_HEIGHT {
+                    continue;
+                }
+                let (screen_x, screen_y) = (sprite.x as u16 + x, sprite.y as u16 + y);
+
+                draw_rectangle(
+                    screen_x as f32 * RENDER_SCALE,
+                    screen_y as f32 * RENDER_SCALE,
+                    RENDER_SCALE,
+                    RENDER_SCALE,
+                    colors[pixels[pixel_idx] as usize],
+                )
+            }
+        }
+    }
 }
 
 pub async fn debug_chr_rom(rom: &NesRom) {

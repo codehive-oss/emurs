@@ -20,7 +20,7 @@ mod render;
 async fn main() -> Result<(), anyhow::Error> {
     println!("Starting Emulator!");
 
-    // let rom = NesRom::read_from_file("./vendor/nestest/nestest.nes")?;
+    // let rom = NesRom::read_from_file("vendor/nes-test-roms/blargg_litewall/litewall5.nes")?;
     let rom = NesRom::read_from_file("./Thwaite.nes")?;
     println!("{rom:#?}");
 
@@ -41,7 +41,6 @@ async fn main() -> Result<(), anyhow::Error> {
         } else {
             if cpu.poll_new_frame() {
                 render_frame(&mut cpu).await;
-                println!("frame");
             }
             cpu.tick();
             handle_keyboard_input(&mut cpu);
@@ -50,8 +49,8 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 fn handle_keyboard_input(cpu: &mut Cpu) {
-    cpu.bus.controller.button_states[CONTROLLER_BUTTON_A] = is_key_down(KeyCode::A);
-    cpu.bus.controller.button_states[CONTROLLER_BUTTON_B] = is_key_down(KeyCode::S);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_A] = is_key_down(KeyCode::S);
+    cpu.bus.controller.button_states[CONTROLLER_BUTTON_B] = is_key_down(KeyCode::A);
     cpu.bus.controller.button_states[CONTROLLER_BUTTON_SELECT] = is_key_down(KeyCode::LeftShift);
     cpu.bus.controller.button_states[CONTROLLER_BUTTON_START] = is_key_down(KeyCode::Enter);
     cpu.bus.controller.button_states[CONTROLLER_BUTTON_UP] = is_key_down(KeyCode::Up);

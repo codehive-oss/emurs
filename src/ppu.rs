@@ -1,4 +1,4 @@
-use crate::memory::Memory;
+use crate::memory::{Memory, Ram};
 use crate::nes_rom::NametableMirroring;
 use crate::ppu::ppu_memory::PpuMemory;
 
@@ -110,12 +110,13 @@ const SCANLINES: u32 = 262;
 const VISIBLE_SCANLIENS: u32 = 240;
 const SCANLINE_CYCLES: u32 = 341;
 
+pub const OAM_SIZE: usize = 0x100;
+
 pub struct Ppu<M: Memory> {
     ctrl: u8,
     mask: u8,
     status: u8,
     oam_addr: u8,
-    oam_data: u8,
     scroll: PpuScroll,
     addr: PpuAddr,
     data_buffer: u8,
@@ -127,6 +128,7 @@ pub struct Ppu<M: Memory> {
     new_frame: bool,
 
     pub memory: M,
+    pub oam: [u8; OAM_SIZE],
 }
 
 impl Ppu<PpuMemory> {
@@ -136,7 +138,6 @@ impl Ppu<PpuMemory> {
             mask: 0,
             status: 0,
             oam_addr: 0,
-            oam_data: 0,
             scroll: PpuScroll::new(),
             addr: PpuAddr::new(),
             data_buffer: 0,
@@ -146,6 +147,7 @@ impl Ppu<PpuMemory> {
             nmi: false,
             new_frame: false,
             memory: PpuMemory::new(chr_rom, mirroring),
+            oam: [0; OAM_SIZE],
         }
     }
 }
@@ -202,8 +204,6 @@ impl<M: Memory> Ppu<M> {
         self.ctrl >> bit & 1 == 1
     }
 
-
-
     pub fn write_ppu_mask(&mut self, value: u8) {
         self.mask = value;
     }
@@ -238,6 +238,19 @@ impl<M: Memory> Ppu<M> {
         } else {
             self.status &= !(1 << bit);
         }
+    }
+
+    pub fn write_oam_addr(&mut self, value: u8) {
+        self.oam_addr = value;
+    }
+
+    pub fn read_oam_data(&mut self) -> u8 {
+        self.oam[self.oam_addr as usize]
+    }
+
+    pub fn write_oam_data(&mut self, value: u8) {
+        self.oam[self.oam_addr as usize] = value;
+        self.oam_addr = self.oam_addr.wrapping_add(1);
     }
 
     pub fn write_ppu_scroll(&mut self, value: u8) {
@@ -276,6 +289,14 @@ impl<M: Memory> Ppu<M> {
         }
     }
 
+    pub fn sprite_pattern_addr(&self) -> u16 {
+        if self.get_ctrl_bit(PPU_CTRL_SPRITE_PATTERN_ADDR_BIT) {
+            0x1000
+        } else {
+            0x0
+        }
+    }
+
     pub fn background_pattern_addr(&self) -> u16 {
         if self.get_ctrl_bit(PPU_CTRL_BACKRGROUND_ADDR_BIT) {
             0x1000
@@ -291,11 +312,11 @@ impl<M: Memory> Ppu<M> {
 
 #[cfg(test)]
 mod test {
-    use crate::memory::{Memory};
-    use crate::ppu::{Ppu, PpuAddr, PpuScroll, PPU_CTRL_VRAM_ADD_INCREMENT_BIT};
+    use crate::memory::test::DummyMemory;
+    use crate::memory::{Memory, Ram};
+    use crate::ppu::{Ppu, PpuAddr, PpuScroll, OAM_SIZE, PPU_CTRL_VRAM_ADD_INCREMENT_BIT};
     use std::cell::RefCell;
     use std::rc::Rc;
-    use crate::memory::test::DummyMemory;
 
     impl<M: Memory> Ppu<M> {
         fn new_with_memory(memory: M) -> Self {
@@ -304,7 +325,6 @@ mod test {
                 mask: 0,
                 status: 0,
                 oam_addr: 0,
-                oam_data: 0,
                 scroll: PpuScroll::new(),
                 addr: PpuAddr::new(),
                 data_buffer: 0,
@@ -314,6 +334,7 @@ mod test {
                 nmi: false,
                 new_frame: false,
                 memory,
+                oam: [0; OAM_SIZE],
             }
         }
 
