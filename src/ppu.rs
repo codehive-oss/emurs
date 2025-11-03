@@ -1,4 +1,4 @@
-use crate::memory::{Memory, Ram};
+use crate::memory::Memory;
 use crate::nes_rom::NametableMirroring;
 use crate::ppu::ppu_memory::PpuMemory;
 
@@ -120,7 +120,6 @@ pub struct Ppu<M: Memory> {
     scroll: PpuScroll,
     addr: PpuAddr,
     data_buffer: u8,
-    oam_dma: u8,
 
     scanline: u32,
     pub cycle: u32,
@@ -141,7 +140,6 @@ impl Ppu<PpuMemory> {
             scroll: PpuScroll::new(),
             addr: PpuAddr::new(),
             data_buffer: 0,
-            oam_dma: 0,
             scanline: 1,
             cycle: 0,
             nmi: false,
@@ -305,6 +303,10 @@ impl<M: Memory> Ppu<M> {
         }
     }
 
+    pub fn tall_sprites(&self) -> bool {
+        self.get_ctrl_bit(PPU_CTRL_SPRITE_SIZE_BIT)
+    }
+
     pub fn base_nametable_index(&self) -> u8 {
         self.ctrl & PPU_CTRL_NAMETABLE_MASK
     }
@@ -313,7 +315,7 @@ impl<M: Memory> Ppu<M> {
 #[cfg(test)]
 mod test {
     use crate::memory::test::DummyMemory;
-    use crate::memory::{Memory, Ram};
+    use crate::memory::Memory;
     use crate::ppu::{Ppu, PpuAddr, PpuScroll, OAM_SIZE, PPU_CTRL_VRAM_ADD_INCREMENT_BIT};
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -328,7 +330,6 @@ mod test {
                 scroll: PpuScroll::new(),
                 addr: PpuAddr::new(),
                 data_buffer: 0,
-                oam_dma: 0,
                 scanline: 1,
                 cycle: 0,
                 nmi: false,

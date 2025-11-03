@@ -110,42 +110,62 @@ async fn render_background(ppu: &mut Ppu<PpuMemory>) {
 
 async fn render_sprites(ppu: &Ppu<PpuMemory>) {
     for oam_idx in (0..OAM_SIZE).step_by(4).rev() {
-        let sprite = Sprite::from_data(&ppu.oam[oam_idx..oam_idx + 4]);
+        let sprite = Sprite::from_data(&ppu.oam[oam_idx..oam_idx + 4], ppu.tall_sprites());
         if !sprite.visible {
             continue;
         }
-        let bank = ppu.sprite_pattern_addr();
-        let tile = sprite.tile_index as u16;
-        let chr_data = ppu.memory.chr_rom
-            [(bank + tile * 16) as usize..(bank + tile * 16 + 16) as usize]
-            .to_vec();
-        let pixels = chr_data_to_pixels(chr_data);
 
-        let colors = get_sprite_palette(ppu, sprite.palette as u16);
-
-        for x in 0..8 {
-            for y in 0..8 {
-                let pixel_idx = (y * 8 + x) as usize;
-                if pixels[pixel_idx] == 0 {
-                    continue;
-                }
-
-                let x = if sprite.flip_horizontally { 7 - x } else { x };
-                let y = if sprite.flip_vertically { 7 - y } else { y };
-
-                if sprite.x as u16 + x > SCREEN_WIDTH || sprite.y as u16 + y > SCREEN_HEIGHT {
-                    continue;
-                }
-                let (screen_x, screen_y) = (sprite.x as u16 + x, sprite.y as u16 + y);
-
-                draw_rectangle(
-                    screen_x as f32 * RENDER_SCALE,
-                    screen_y as f32 * RENDER_SCALE,
-                    RENDER_SCALE,
-                    RENDER_SCALE,
-                    colors[pixels[pixel_idx] as usize],
-                )
+        if ppu.tall_sprites() {
+            let bank = sprite.bank;
+            let (mut top_tile, mut bottom_tile) = (sprite.tile_index, sprite.tile_index + 1);
+            if sprite.flip_vertically {
+                (top_tile, bottom_tile) = (bottom_tile, top_tile);
             }
+            render_sprite_tile(&sprite, ppu, bank, top_tile, 0).await;
+            render_sprite_tile(&sprite, ppu, bank, bottom_tile, 8).await;
+        } else {
+            let bank = ppu.sprite_pattern_addr();
+            let tile = sprite.tile_index;
+            render_sprite_tile(&sprite, ppu, bank, tile, 0).await;
+        }
+    }
+}
+
+async fn render_sprite_tile(
+    sprite: &Sprite,
+    ppu: &Ppu<PpuMemory>,
+    bank: u16,
+    tile: u16,
+    y_offset: u16,
+) {
+    let chr_data =
+        ppu.memory.chr_rom[(bank + tile * 16) as usize..(bank + tile * 16 + 16) as usize].to_vec();
+    let pixels = chr_data_to_pixels(chr_data);
+
+    let colors = get_sprite_palette(ppu, sprite.palette as u16);
+
+    for x in 0..8 {
+        for y in 0..8 {
+            let pixel_idx = (y * 8 + x) as usize;
+            if pixels[pixel_idx] == 0 {
+                continue;
+            }
+
+            let x = if sprite.flip_horizontally { 7 - x } else { x };
+            let y = if sprite.flip_vertically { 7 - y } else { y };
+            if sprite.x + x > SCREEN_WIDTH || sprite.y + y_offset + y > SCREEN_HEIGHT {
+                continue;
+            }
+
+            let (screen_x, screen_y) = (sprite.x + x, sprite.y + y_offset + y);
+
+            draw_rectangle(
+                screen_x as f32 * RENDER_SCALE,
+                screen_y as f32 * RENDER_SCALE,
+                RENDER_SCALE,
+                RENDER_SCALE,
+                colors[pixels[pixel_idx] as usize],
+            )
         }
     }
 }

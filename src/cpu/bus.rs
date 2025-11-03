@@ -100,7 +100,7 @@ impl Bus {
         } else if (0x6000..0x8000).contains(&a) {
             self.prg_ram.write(a - 0x6000, v);
         } else {
-            panic!("Tried to write to unmapped address: {:#X}", a)
+            println!("Tried to write to unmapped address: {:#X}", a)
         }
     }
 

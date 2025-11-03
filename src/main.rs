@@ -21,7 +21,7 @@ async fn main() -> Result<(), anyhow::Error> {
     println!("Starting Emulator!");
 
     // let rom = NesRom::read_from_file("vendor/nes-test-roms/blargg_litewall/litewall5.nes")?;
-    let rom = NesRom::read_from_file("./Thwaite.nes")?;
+    let rom = NesRom::read_from_file("./lode_runner.nes")?;
     println!("{rom:#?}");
 
     let bus = Bus::new(rom.clone());
